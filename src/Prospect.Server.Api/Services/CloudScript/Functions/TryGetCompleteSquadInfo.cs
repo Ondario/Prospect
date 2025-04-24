@@ -1,76 +1,55 @@
+using Prospect.Server.Api.Services.Auth.Extensions;
+using Prospect.Server.Api.Services.CloudScript.Models;
+using Prospect.Server.Api.Services.Squad;
 using System.Text.Json.Serialization;
-using Prospect.Server.Api.Services.CloudScript;
 
-public class TryGetCompleteSquadInfoRequest
-{
-    // Empty request
-}
+namespace Prospect.Server.Api.Services.CloudScript.Functions;
 
-public class FYPlayFabSquad
+public class FYTryGetCompleteSquadInfoRequest
 {
     [JsonPropertyName("squadId")]
-    public string SquadID { get; set; }
-    [JsonPropertyName("members")]
-    public FYPlayFabSquadMember[] Members { get; set; }
+    public string SquadId { get; set; }
 }
 
-public class FYPlayFabSquadMember {
-    [JsonPropertyName("profile")]
-	public FYPlayFabPlayerProfile Profile { get; set; }
-    [JsonPropertyName("onlineState")]
-	public int onlineState { get; set; }
-    [JsonPropertyName("matchmakingSettings")]
-	public FYUserMatchmakingSettings matchmakingSettings { get; set; }
-    [JsonPropertyName("mapRowNamesUnlocked")]
-	public string[] mapRowNamesUnlocked { get; set; }
-};
-
-public class FYPlayFabPlayerProfile {
-    [JsonPropertyName("avatarUrl")]
-	public string AvatarUrl { get; set; }
-    [JsonPropertyName("displayName")]
-	public string DisplayName { get; set; }
-    [JsonPropertyName("playerId")]
-	public string PlayerId { get; set; }
-};
-
-public class FYUserMatchmakingSettings {
-    [JsonPropertyName("isReadyForMatch")]
-	public bool isReadyForMatch;
-    [JsonPropertyName("selectedMapName")]
-	public string selectedMapName;
-    [JsonPropertyName("isSecretLeader")]
-	public bool isSecretLeader;
-    [JsonPropertyName("purchaseInsuranceRequest")]
-	public object purchaseInsuranceRequest; // FYPurchaseInsuranceRequest
-};
-
+public class FYTryGetCompleteSquadInfoResponse
+{
+    [JsonPropertyName("success")]
+    public bool Success { get; set; }
+    
+    [JsonPropertyName("squad")]
+    public Prospect.Server.Api.Models.Data.SquadData Squad { get; set; }
+    
+    [JsonPropertyName("error")]
+    public string Error { get; set; }
+}
 
 [CloudScriptFunction("TryGetCompleteSquadInfo")]
-public class TryGetCompleteSquadInfoFunction : ICloudScriptFunction<TryGetCompleteSquadInfoRequest, FYPlayFabSquad>
+public class TryGetCompleteSquadInfo : ICloudScriptFunction<FYTryGetCompleteSquadInfoRequest, FYTryGetCompleteSquadInfoResponse>
 {
-    private readonly ILogger<TryGetCompleteSquadInfoFunction> _logger;
-    private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly SquadService _squadService;
 
-    public TryGetCompleteSquadInfoFunction(ILogger<TryGetCompleteSquadInfoFunction> logger, IHttpContextAccessor httpContextAccessor)
+    public TryGetCompleteSquadInfo(SquadService squadService)
     {
-        _httpContextAccessor = httpContextAccessor;
-        _logger = logger;
+        _squadService = squadService;
     }
 
-    public async Task<FYPlayFabSquad> ExecuteAsync(TryGetCompleteSquadInfoRequest request)
+    public Task<FYTryGetCompleteSquadInfoResponse> ExecuteAsync(FYTryGetCompleteSquadInfoRequest request)
     {
-        var context = _httpContextAccessor.HttpContext;
-        if (context == null)
+        // Get the squad by ID
+        var squad = _squadService.GetSquad(request.SquadId);
+        if (squad == null)
         {
-            throw new CloudScriptException("CloudScript was not called within a http request");
+            return Task.FromResult(new FYTryGetCompleteSquadInfoResponse
+            {
+                Success = false,
+                Error = "Squad not found"
+            });
         }
-        // var userId = context.User.FindAuthUserId();
 
-        return new FYPlayFabSquad
+        return Task.FromResult(new FYTryGetCompleteSquadInfoResponse
         {
-            // SquadID = "100",
-            // Members = [],
-        };
+            Success = true,
+            Squad = squad
+        });
     }
 }

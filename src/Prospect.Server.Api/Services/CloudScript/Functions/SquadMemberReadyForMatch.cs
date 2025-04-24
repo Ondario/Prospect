@@ -1,70 +1,91 @@
-﻿using System.Text.Json.Serialization;
-using Prospect.Server.Api.Services.CloudScript;
-using Prospect.Server.Api.Services.Auth.Extensions;
+﻿using Prospect.Server.Api.Services.Auth.Extensions;
+using Prospect.Server.Api.Services.CloudScript.Models;
+using Prospect.Server.Api.Services.Squad;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.SignalR;
 using Prospect.Server.Api.Hubs;
 
-public class SquadMemberReadyForMatchRequest
+namespace Prospect.Server.Api.Services.CloudScript.Functions;
+
+public class FYSquadMemberReadyForMatchRequest
 {
-    [JsonPropertyName("squadId")]
-    public string SquadID { get; set; }
-    [JsonPropertyName("matchmakingSettings")]
-	public FYUserMatchmakingSettings matchmakingSettings { get; set; }
+    [JsonPropertyName("isReady")]
+    public bool IsReady { get; set; }
 }
 
-public class SquadMemberReadyForMatchResponse
+public class FYSquadMemberReadyForMatchResponse
 {
-    [JsonPropertyName("result")]
-	public int Result { get; set; } // EYSquadActionResult
-    [JsonPropertyName("squad")]
-	public FYPlayFabSquad Squad { get; set; }
-    [JsonPropertyName("isSquadReadyForMatch")]
-	public bool IsSquadReadyForMatch { get; set; }
+    [JsonPropertyName("success")]
+    public bool Success { get; set; }
+    
+    [JsonPropertyName("error")]
+    public string Error { get; set; }
 }
 
 [CloudScriptFunction("SquadMemberReadyForMatch")]
-public class SquadMemberReadyForMatchFunction : ICloudScriptFunction<SquadMemberReadyForMatchRequest, SquadMemberReadyForMatchResponse>
+public class SquadMemberReadyForMatch : ICloudScriptFunction<FYSquadMemberReadyForMatchRequest, FYSquadMemberReadyForMatchResponse>
 {
-    private readonly ILogger<SquadMemberReadyForMatchFunction> _logger;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly SquadService _squadService;
     private readonly IHubContext<CycleHub> _hubContext;
 
-    public SquadMemberReadyForMatchFunction(ILogger<SquadMemberReadyForMatchFunction> logger, IHttpContextAccessor httpContextAccessor, IHubContext<CycleHub> hubContext)
+    public SquadMemberReadyForMatch(IHttpContextAccessor httpContextAccessor, SquadService squadService, IHubContext<CycleHub> hubContext)
     {
         _httpContextAccessor = httpContextAccessor;
-        _logger = logger;
+        _squadService = squadService;
         _hubContext = hubContext;
     }
 
-    public async Task<SquadMemberReadyForMatchResponse> ExecuteAsync(SquadMemberReadyForMatchRequest request)
+    public async Task<FYSquadMemberReadyForMatchResponse> ExecuteAsync(FYSquadMemberReadyForMatchRequest request)
     {
         var context = _httpContextAccessor.HttpContext;
         if (context == null)
         {
             throw new CloudScriptException("CloudScript was not called within a http request");
         }
-        var userId = context.User.FindAuthUserId();
 
-        return new SquadMemberReadyForMatchResponse
+        var userId = context.User.FindAuthUserId();
+        
+        // Check if player is in a squad
+        var squad = await _squadService.GetPlayerSquadAsync(userId);
+        if (squad == null)
         {
-            Result = 0, // EYSquadActionResult::OK
-            Squad = new FYPlayFabSquad {
-                SquadID = "100", // TODO
-                // Members = [
-                //     new FYPlayFabSquadMember {
-                //         Profile = new FYPlayFabPlayerProfile {
-                //             PlayerId = userId,
-                //         },
-                //         onlineState = 0, // EYUserState::IN_STATION
-                //         matchmakingSettings = new FYUserMatchmakingSettings {
-                //             isReadyForMatch = true,
-                //             isSecretLeader = true,
-                //             selectedMapName = "Map01",
-                //         }
-                //     }
-                // ],
-            },
-            IsSquadReadyForMatch = true,
+            return new FYSquadMemberReadyForMatchResponse
+            {
+                Success = false,
+                Error = "Player is not in a squad"
+            };
+        }
+
+        // Set player's ready status
+        var success = _squadService.SetPlayerReady(squad.SquadId, userId, request.IsReady);
+        if (!success)
+        {
+            return new FYSquadMemberReadyForMatchResponse
+            {
+                Success = false,
+                Error = "Failed to set ready status"
+            };
+        }
+
+        // Update the squad
+        squad = _squadService.GetSquad(squad.SquadId);
+
+        // Notify squad members of the status change
+        foreach (var member in squad.Members)
+        {
+            await _hubContext.Clients.User(member.UserId).SendAsync("SquadMemberStatusChanged", new
+            {
+                SquadId = squad.SquadId,
+                UserId = userId,
+                IsReady = request.IsReady,
+                AllReady = squad.AllReady
+            });
+        }
+
+        return new FYSquadMemberReadyForMatchResponse
+        {
+            Success = true
         };
     }
 }

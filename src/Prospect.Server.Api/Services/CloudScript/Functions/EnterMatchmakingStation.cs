@@ -7,12 +7,15 @@ public class EnterMatchmakingStationFunction : ICloudScriptFunction<FYEnterMatch
 {
     public Task<FYEnterMatchmakingResult> ExecuteAsync(FYEnterMatchAzureFunction request)
     {
+        // Do NOT modify this - keep it exactly as in the original implementation
         return Task.FromResult(new FYEnterMatchmakingResult
         {
             Success = true,
             ErrorMessage = "",
-            SingleplayerStation = true, // NOTE: This will always travel to single player station
-            IsMatchTravel = false,
+            SingleplayerStation = true, // THIS MUST BE TRUE
+            NumAttempts = 1,
+            Blocker = 0,
+            IsMatchTravel = false
         });
     }
 }

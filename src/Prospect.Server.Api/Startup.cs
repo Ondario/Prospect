@@ -40,6 +40,7 @@ public class Startup
 
         services.AddScoped<CloudScriptService>();
         services.AddSingleton<CloudScriptFunctionLoader>();
+        services.AddSingleton<Services.Squad.SquadService>();
 
         services.AddAuthentication(_ =>
             {

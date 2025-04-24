@@ -4,18 +4,11 @@ using Microsoft.AspNetCore.SignalR;
 using Prospect.Server.Api.Hubs;
 using Prospect.Server.Api.Services.Auth.Extensions;
 using Prospect.Server.Api.Services.CloudScript.Models;
+using Prospect.Server.Api.Services.Squad;
 using Prospect.Server.Api.Services.UserData;
+using Prospect.Server.Api.Models;
 
 namespace Prospect.Server.Api.Services.CloudScript.Functions;
-
-public class OnSquadMatchmakingSuccessMessage {
-    [JsonPropertyName("success")]
-    public bool Success { get; set; }
-    [JsonPropertyName("sessionId")]
-    public string SessionID { get; set; }
-    [JsonPropertyName("squadId")]
-    public string SquadID { get; set; }
-}
 
 [CloudScriptFunction("EnterMatchmakingMatch")]
 public class EnterMatchmakingMatchFunction : ICloudScriptFunction<FYEnterMatchAzureFunction, FYEnterMatchmakingResult>
@@ -24,13 +17,20 @@ public class EnterMatchmakingMatchFunction : ICloudScriptFunction<FYEnterMatchAz
     private readonly IHubContext<CycleHub> _hubContext;
     private readonly UserDataService _userDataService;
     private readonly TitleDataService _titleDataService;
+    private readonly SquadService _squadService;
 
-    public EnterMatchmakingMatchFunction(IHubContext<CycleHub> hubContext, IHttpContextAccessor httpContextAccessor, UserDataService userDataService, TitleDataService titleDataService)
+    public EnterMatchmakingMatchFunction(
+        IHubContext<CycleHub> hubContext, 
+        IHttpContextAccessor httpContextAccessor, 
+        UserDataService userDataService, 
+        TitleDataService titleDataService,
+        SquadService squadService)
     {
         _httpContextAccessor = httpContextAccessor;
         _hubContext = hubContext;
         _userDataService = userDataService;
         _titleDataService = titleDataService;
+        _squadService = squadService;
     }
 
     public async Task<FYEnterMatchmakingResult> ExecuteAsync(FYEnterMatchAzureFunction request)
@@ -51,10 +51,8 @@ public class EnterMatchmakingMatchFunction : ICloudScriptFunction<FYEnterMatchAz
         );
         var inventory = JsonSerializer.Deserialize<List<FYCustomItemInfo>>(userData["Inventory"].Value);
         var contractsActive = JsonSerializer.Deserialize<FYGetActiveContractsResult>(userData["ContractsActive"].Value);
-        // Compute delivery quest progress before deploy.
-        // This ensures that the quest progress will be shown on the planet.
-        // The station doesn't seem to care about delivery quests progress and calculates progress
-        // based on actual items in stash. And so does the "ClaimActiveContract" function.
+        
+        // Update contract progress for delivery quests
         foreach (var contractActive in contractsActive.Contracts) {
             if (!contracts.TryGetValue(contractActive.ContractID, out var contract)) {
                 continue;
@@ -86,21 +84,72 @@ public class EnterMatchmakingMatchFunction : ICloudScriptFunction<FYEnterMatchAz
             }
         );
 
-        await _hubContext.Clients.All.SendAsync("OnSquadMatchmakingSuccess", new OnSquadMatchmakingSuccessMessage {
-            Success = true,
-            SessionID = request.MapName, // TODO: Need to implement TryGetCompleteSquadInfo and pass squad info
-            SquadID = request.SquadId,
-        });
+        // For squad matchmaking
+        if (!string.IsNullOrEmpty(request.SquadId) && request.SquadId != "_")
+        {
+            var squad = _squadService.GetSquad(request.SquadId);
+            if (squad != null)
+            {
+                try
+                {
+                    // Ensure we have a session ID for the squad
+                    if (string.IsNullOrEmpty(squad.SessionId))
+                    {
+                        // Generate a session ID for the squad
+                        squad.SessionId = Guid.NewGuid().ToString();
+                        
+                        // Complete matchmaking for the squad
+                        _squadService.CompleteMatchmaking(squad.SquadId, squad.SessionId);
+                    }
+                    
+                    // Notify all squad members about matchmaking success
+                    await _hubContext.Clients.Group($"squad_{squad.SquadId}").SendAsync("OnSquadMatchmakingSuccess", new OnSquadMatchmakingSuccessMessage {
+                        Success = true,
+                        SessionID = request.MapName,
+                        SquadID = squad.SquadId
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error in squad match entry: {ex.Message}");
+                }
+                
+                return new FYEnterMatchmakingResult
+                {
+                    Success = true,
+                    ErrorMessage = "",
+                    SingleplayerStation = false, // Important: False to actually enter a match
+                    NumAttempts = 1,
+                    Blocker = 0,
+                    IsMatchTravel = true,
+                    SessionId = squad.SessionId
+                };
+            }
+        }
+
+        // Solo player
+        try
+        {
+            await _hubContext.Clients.User(userId).SendAsync("OnSquadMatchmakingSuccess", new OnSquadMatchmakingSuccessMessage {
+                Success = true,
+                SessionID = request.MapName,
+                SquadID = request.SquadId ?? "_"
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error sending solo match entry notification: {ex.Message}");
+        }
 
         return new FYEnterMatchmakingResult
         {
             Success = true,
             ErrorMessage = "",
-            SingleplayerStation = false,
+            SingleplayerStation = false, // VERY IMPORTANT: Must be false to enter match
             NumAttempts = 1,
             Blocker = 0,
             IsMatchTravel = true,
-            SessionId = "", // TODO: Not sure how this affects match travel
+            SessionId = Guid.NewGuid().ToString()
         };
     }
 }
