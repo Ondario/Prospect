@@ -6,13 +6,25 @@ using Prospect.Server.Api.Services.Auth.Extensions;
 using Prospect.Server.Api.Services.CloudScript.Models;
 using Prospect.Server.Api.Services.Squad;
 using Prospect.Server.Api.Services.UserData;
-using Prospect.Server.Api.Models;
 
 namespace Prospect.Server.Api.Services.CloudScript.Functions;
+
+public class OnSquadMatchmakingSuccessMessage 
+{
+    [JsonPropertyName("success")]
+    public bool Success { get; set; }
+    
+    [JsonPropertyName("sessionId")]
+    public string SessionID { get; set; }
+    
+    [JsonPropertyName("squadId")]
+    public string SquadID { get; set; }
+}
 
 [CloudScriptFunction("EnterMatchmakingMatch")]
 public class EnterMatchmakingMatchFunction : ICloudScriptFunction<FYEnterMatchAzureFunction, FYEnterMatchmakingResult>
 {
+    private readonly ILogger<EnterMatchmakingMatchFunction> _logger;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly IHubContext<CycleHub> _hubContext;
     private readonly UserDataService _userDataService;
@@ -20,12 +32,14 @@ public class EnterMatchmakingMatchFunction : ICloudScriptFunction<FYEnterMatchAz
     private readonly SquadService _squadService;
 
     public EnterMatchmakingMatchFunction(
+        ILogger<EnterMatchmakingMatchFunction> logger,
         IHubContext<CycleHub> hubContext, 
         IHttpContextAccessor httpContextAccessor, 
         UserDataService userDataService, 
         TitleDataService titleDataService,
-        SquadService squadService)
+        SquadService squadService = null)
     {
+        _logger = logger;
         _httpContextAccessor = httpContextAccessor;
         _hubContext = hubContext;
         _userDataService = userDataService;
@@ -38,118 +52,61 @@ public class EnterMatchmakingMatchFunction : ICloudScriptFunction<FYEnterMatchAz
         var context = _httpContextAccessor.HttpContext;
         if (context == null)
         {
+            _logger.LogError("[MATCH] No HTTP context available in EnterMatchmakingMatch");
             throw new CloudScriptException("CloudScript was not called within a http request");
         }
 
         var userId = context.User.FindAuthUserId();
-        var titleData = _titleDataService.Find(new List<string>{"Contracts"});
-        var contracts = JsonSerializer.Deserialize<Dictionary<string, TitleDataContractInfo>>(titleData["Contracts"]);
-
-        var userData = await _userDataService.FindAsync(
-            userId, userId,
-            new List<string>{"ContractsActive", "Inventory"}
-        );
-        var inventory = JsonSerializer.Deserialize<List<FYCustomItemInfo>>(userData["Inventory"].Value);
-        var contractsActive = JsonSerializer.Deserialize<FYGetActiveContractsResult>(userData["ContractsActive"].Value);
         
-        // Update contract progress for delivery quests
-        foreach (var contractActive in contractsActive.Contracts) {
-            if (!contracts.TryGetValue(contractActive.ContractID, out var contract)) {
-                continue;
-            }
-            for (var i = 0; i < contract.Objectives.Length; i++) {
-                var objective = contract.Objectives[i];
-                if (objective.Type != EYContractObjectiveType.OwnNumOfItem) {
-                    continue;
-                }
-                int remaining = objective.MaxProgress;
-                foreach (var item in inventory) {
-                    if (item.BaseItemId != objective.ItemToOwn) {
-                        continue;
-                    }
-                    remaining -= item.Amount;
-                    if (remaining <= 0) {
-                        remaining = 0;
-                        break;
-                    }
-                }
-                contractActive.Progress[i] = objective.MaxProgress - remaining;
-            }
+        _logger.LogInformation(
+            "[MATCH] EnterMatchmakingMatch called by {UserId} with MapName={MapName}, SquadId={SquadId}",
+            userId, request.MapName, request.SquadId ?? "null");
+            
+        // Validate map name format
+        string mapName = request.MapName;
+        if (!mapName.StartsWith("/Game/Maps/"))
+        {
+            // Fix map path format if needed
+            if (mapName == "BrightSands")
+                mapName = "/Game/Maps/MP/BrightSands/BrightSands_P";
+            else if (mapName == "CrescentFalls")
+                mapName = "/Game/Maps/MP/CrescentFalls/CrescentFalls_P";
+            else if (mapName == "TharisIsland")
+                mapName = "/Game/Maps/MP/TharisIsland/TharisIsland_P";
+            
+            _logger.LogInformation("[MATCH] Corrected map name to: {MapName}", mapName);
         }
 
-        await _userDataService.UpdateAsync(
-            userId, userId,
-            new Dictionary<string, string>{
-                ["ContractsActive"] = JsonSerializer.Serialize(contractsActive),
-            }
-        );
-
-        // For squad matchmaking
-        if (!string.IsNullOrEmpty(request.SquadId) && request.SquadId != "_")
-        {
-            var squad = _squadService.GetSquad(request.SquadId);
-            if (squad != null)
-            {
-                try
-                {
-                    // Ensure we have a session ID for the squad
-                    if (string.IsNullOrEmpty(squad.SessionId))
-                    {
-                        // Generate a session ID for the squad
-                        squad.SessionId = Guid.NewGuid().ToString();
-                        
-                        // Complete matchmaking for the squad
-                        _squadService.CompleteMatchmaking(squad.SquadId, squad.SessionId);
-                    }
-                    
-                    // Notify all squad members about matchmaking success
-                    await _hubContext.Clients.Group($"squad_{squad.SquadId}").SendAsync("OnSquadMatchmakingSuccess", new OnSquadMatchmakingSuccessMessage {
-                        Success = true,
-                        SessionID = request.MapName,
-                        SquadID = squad.SquadId
-                    });
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error in squad match entry: {ex.Message}");
-                }
-                
-                return new FYEnterMatchmakingResult
-                {
+        // Generate unique session ID
+        string sessionId = Guid.NewGuid().ToString();
+        
+        // Send SignalR notification - CRITICAL for matchmaking!
+        try {
+            _logger.LogInformation("[MATCH] Broadcasting matchmaking success notification");
+            
+            // IMPORTANT: We must broadcast to ALL clients
+            await _hubContext.Clients.All.SendAsync("OnSquadMatchmakingSuccess", 
+                new OnSquadMatchmakingSuccessMessage {
                     Success = true,
-                    ErrorMessage = "",
-                    SingleplayerStation = false, // Important: False to actually enter a match
-                    NumAttempts = 1,
-                    Blocker = 0,
-                    IsMatchTravel = true,
-                    SessionId = squad.SessionId
-                };
-            }
+                    SessionID = mapName,
+                    SquadID = request.SquadId ?? "_"
+                });
+                
+            _logger.LogInformation("[MATCH] Successfully broadcast matchmaking notification");
+        } catch (Exception ex) {
+            _logger.LogError("[MATCH] Failed to send matchmaking notification: {Error}", ex.Message);
         }
 
-        // Solo player
-        try
-        {
-            await _hubContext.Clients.User(userId).SendAsync("OnSquadMatchmakingSuccess", new OnSquadMatchmakingSuccessMessage {
-                Success = true,
-                SessionID = request.MapName,
-                SquadID = request.SquadId ?? "_"
-            });
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error sending solo match entry notification: {ex.Message}");
-        }
-
+        // Return result that will trigger map travel
         return new FYEnterMatchmakingResult
         {
             Success = true,
             ErrorMessage = "",
-            SingleplayerStation = false, // VERY IMPORTANT: Must be false to enter match
+            SingleplayerStation = false,  // CRITICAL: must be false to go to a match
             NumAttempts = 1,
             Blocker = 0,
-            IsMatchTravel = true,
-            SessionId = Guid.NewGuid().ToString()
+            IsMatchTravel = true,  // CRITICAL: must be true
+            SessionId = sessionId,
         };
     }
 }

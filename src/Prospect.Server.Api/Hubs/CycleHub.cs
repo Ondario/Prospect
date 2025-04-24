@@ -1,6 +1,5 @@
 ﻿using Microsoft.AspNetCore.SignalR;
 using Prospect.Server.Api.Services.Auth.Extensions;
-using Prospect.Server.Api.Services.Squad;
 using System.Collections.Concurrent;
 
 namespace Prospect.Server.Api.Hubs;
@@ -8,51 +7,48 @@ namespace Prospect.Server.Api.Hubs;
 public class CycleHub : Hub
 {
     private readonly ILogger<CycleHub> _logger;
-    private readonly SquadService _squadService;
     
     // Store connection IDs for each user
     private static readonly ConcurrentDictionary<string, string> _userConnectionMap = new();
 
-    public CycleHub(ILogger<CycleHub> logger, SquadService squadService)
+    public CycleHub(ILogger<CycleHub> logger)
     {
         _logger = logger;
-        _squadService = squadService;
     }
 
     public override async Task OnConnectedAsync()
     {
         try
         {
-            var userId = Context.User.FindAuthUserId();
-            _logger.LogInformation("User {UserId} connected with connection ID {ConnectionId}", userId, Context.ConnectionId);
-            
-            // Store the connection ID for the user
-            _userConnectionMap[userId] = Context.ConnectionId;
-            
-            // Add the connection to the user's group
-            await Groups.AddToGroupAsync(Context.ConnectionId, $"user_{userId}");
-            
-            // Check if user is in a squad
-            var squad = await _squadService.GetPlayerSquadAsync(userId);
-            if (squad != null)
+            // Try to get user ID if authenticated
+            string userId = null;
+            try
             {
-                // Add the connection to the squad group
-                await Groups.AddToGroupAsync(Context.ConnectionId, $"squad_{squad.SquadId}");
-                
-                // Update the user's connection status in the squad
-                var member = squad.Members.FirstOrDefault(m => m.UserId == userId);
-                if (member != null)
+                if (Context.User != null && Context.User.Identity?.IsAuthenticated == true)
                 {
-                    member.IsConnected = true;
-                    
-                    // Notify squad members of the status change
-                    await Clients.Group($"squad_{squad.SquadId}").SendAsync("SquadMemberConnectionChanged", new
-                    {
-                        SquadId = squad.SquadId,
-                        UserId = userId,
-                        IsConnected = true
-                    });
+                    userId = Context.User.FindAuthUserId();
                 }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("Unable to get user ID from context: {Error}", ex.Message);
+                // Continue without user ID - the connection is still valid
+            }
+
+            if (!string.IsNullOrEmpty(userId))
+            {
+                _logger.LogInformation("User {UserId} connected with connection ID {ConnectionId}", 
+                    userId, Context.ConnectionId);
+                
+                // Store the connection ID for the user
+                _userConnectionMap[userId] = Context.ConnectionId;
+                
+                // Add the connection to user group for direct messaging
+                await Groups.AddToGroupAsync(Context.ConnectionId, $"user_{userId}");
+            }
+            else
+            {
+                _logger.LogInformation("Anonymous connection {ConnectionId}", Context.ConnectionId);
             }
         }
         catch (Exception ex)
@@ -63,40 +59,38 @@ public class CycleHub : Hub
         await base.OnConnectedAsync();
     }
 
-    public override async Task OnDisconnectedAsync(Exception? exception)
+    public override async Task OnDisconnectedAsync(Exception exception)
     {
         try
         {
-            var userId = Context.User.FindAuthUserId();
-            _logger.LogInformation("User {UserId} disconnected with connection ID {ConnectionId}", userId, Context.ConnectionId);
-            
-            // Remove the connection ID for the user
-            _userConnectionMap.TryRemove(userId, out _);
-            
-            // Remove the connection from the user's group
-            await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"user_{userId}");
-            
-            // Check if user is in a squad
-            var squad = await _squadService.GetPlayerSquadAsync(userId);
-            if (squad != null)
+            // Try to get user ID if authenticated
+            string userId = null;
+            try
             {
-                // Remove the connection from the squad group
-                await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"squad_{squad.SquadId}");
-                
-                // Update the user's connection status in the squad
-                var member = squad.Members.FirstOrDefault(m => m.UserId == userId);
-                if (member != null)
+                if (Context.User != null && Context.User.Identity?.IsAuthenticated == true)
                 {
-                    member.IsConnected = false;
-                    
-                    // Notify squad members of the status change
-                    await Clients.Group($"squad_{squad.SquadId}").SendAsync("SquadMemberConnectionChanged", new
-                    {
-                        SquadId = squad.SquadId,
-                        UserId = userId,
-                        IsConnected = false
-                    });
+                    userId = Context.User.FindAuthUserId();
                 }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("Unable to get user ID during disconnect: {Error}", ex.Message);
+            }
+
+            if (!string.IsNullOrEmpty(userId))
+            {
+                _logger.LogInformation("User {UserId} disconnected with connection ID {ConnectionId}", 
+                    userId, Context.ConnectionId);
+                
+                // Remove the connection ID for the user
+                _userConnectionMap.TryRemove(userId, out _);
+                
+                // Remove connection from user group
+                await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"user_{userId}");
+            }
+            else
+            {
+                _logger.LogInformation("Anonymous connection {ConnectionId} disconnected", Context.ConnectionId);
             }
         }
         catch (Exception ex)
@@ -110,6 +104,9 @@ public class CycleHub : Hub
     // Helper method to get the connection ID for a user
     public static string GetConnectionIdForUser(string userId)
     {
+        if (string.IsNullOrEmpty(userId))
+            return null;
+            
         _userConnectionMap.TryGetValue(userId, out var connectionId);
         return connectionId;
     }

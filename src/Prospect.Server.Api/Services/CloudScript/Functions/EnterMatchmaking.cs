@@ -4,100 +4,63 @@ using Prospect.Server.Api.Hubs;
 using Prospect.Server.Api.Services.Auth.Extensions;
 using Prospect.Server.Api.Services.CloudScript.Models;
 using Prospect.Server.Api.Services.Squad;
-using Prospect.Server.Api.Models;
 
 namespace Prospect.Server.Api.Services.CloudScript.Functions;
 
 [CloudScriptFunction("EnterMatchmaking")]
 public class EnterMatchmakingFunction : ICloudScriptFunction<FYEnterMatchAzureFunction, FYEnterMatchAzureFunctionResult>
 {
-    private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly ILogger<EnterMatchmakingFunction> _logger;
     private readonly IHubContext<CycleHub> _hubContext;
+    private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly SquadService _squadService;
 
-    public EnterMatchmakingFunction(IHttpContextAccessor httpContextAccessor, IHubContext<CycleHub> hubContext, SquadService squadService)
+    public EnterMatchmakingFunction(
+        ILogger<EnterMatchmakingFunction> logger,
+        IHubContext<CycleHub> hubContext, 
+        IHttpContextAccessor httpContextAccessor, 
+        SquadService squadService = null)
     {
-        _httpContextAccessor = httpContextAccessor;
+        _logger = logger;
         _hubContext = hubContext;
+        _httpContextAccessor = httpContextAccessor;
         _squadService = squadService;
     }
 
     public async Task<FYEnterMatchAzureFunctionResult> ExecuteAsync(FYEnterMatchAzureFunction request)
     {
-        var context = _httpContextAccessor.HttpContext;
-        if (context == null)
-        {
-            throw new CloudScriptException("CloudScript was not called within a http request");
-        }
-
-        var userId = context.User.FindAuthUserId();
+        var userId = _httpContextAccessor?.HttpContext?.User?.FindAuthUserId() ?? "unknown";
         
-        // For squad matchmaking
-        if (!string.IsNullOrEmpty(request.SquadId) && request.SquadId != "_")
-        {
-            var squad = _squadService.GetSquad(request.SquadId);
-            if (squad != null)
-            {
-                try
-                {
-                    // Start matchmaking for the squad
-                    _squadService.StartMatchmaking(squad.SquadId);
-                    
-                    // Generate a session ID for the squad
-                    var sessionId = Guid.NewGuid().ToString();
-                    
-                    // Complete matchmaking for the squad
-                    _squadService.CompleteMatchmaking(squad.SquadId, sessionId);
-                    
-                    // Notify all squad members about matchmaking success
-                    foreach (var member in squad.Members)
-                    {
-                        await _hubContext.Clients.User(member.UserId).SendAsync("OnSquadMatchmakingSuccess", new OnSquadMatchmakingSuccessMessage {
-                            Success = true,
-                            SessionID = request.MapName, // Use the requested map
-                            SquadID = squad.SquadId
-                        });
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error in squad matchmaking: {ex.Message}");
-                }
-                
-                return new FYEnterMatchAzureFunctionResult
-                {
-                    Success = true,
-                    ErrorMessage = "",
-                    SingleplayerStation = false, // Important: False to actually enter a match
-                    Address = request.MapName,
-                    MaintenanceMode = false,
-                    Port = 7777,
-                };
-            }
-        }
+        _logger.LogInformation(
+            "[MATCH] EnterMatchmaking called by {UserId} with MapName={MapName}, SquadId={SquadId}",
+            userId, request.MapName, request.SquadId ?? "null");
 
-        // Solo player - just use whatever map was requested
-        try
+        // Validate map name format
+        string mapName = request.MapName;
+        if (!mapName.StartsWith("/Game/Maps/"))
         {
-            // The client expects this notification
-            await _hubContext.Clients.User(userId).SendAsync("OnSquadMatchmakingSuccess", new OnSquadMatchmakingSuccessMessage {
-                Success = true,
-                SessionID = request.MapName,
-                SquadID = request.SquadId ?? "_"
-            });
+            // Fix map path format if needed
+            if (mapName == "BrightSands")
+                mapName = "/Game/Maps/MP/BrightSands/BrightSands_P";
+            else if (mapName == "CrescentFalls")
+                mapName = "/Game/Maps/MP/CrescentFalls/CrescentFalls_P";
+            else if (mapName == "TharisIsland")
+                mapName = "/Game/Maps/MP/TharisIsland/TharisIsland_P";
+            
+            _logger.LogInformation("[MATCH] Corrected map name to: {MapName}", mapName);
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error sending solo matchmaking notification: {ex.Message}");
-        }
-
+        
+        // Check if this is a squad matchmaking request
+        bool isSquad = !string.IsNullOrEmpty(request.SquadId) && request.SquadId != "_";
+        _logger.LogInformation("[MATCH] Is Squad Request: {IsSquad}", isSquad);
+        
+        // Set SingleplayerStation to false to route directly to a match
         return new FYEnterMatchAzureFunctionResult
         {
             Success = true,
             ErrorMessage = "",
-            // THIS IS CRITICAL: False means it will enter a map, True means it will go to station
             SingleplayerStation = false,
-            Address = request.MapName,
+            Address = mapName,
             MaintenanceMode = false,
             Port = 7777,
         };

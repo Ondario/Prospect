@@ -1,381 +1,475 @@
-using Microsoft.Extensions.Options;
-using Prospect.Server.Api.Config;
 using Prospect.Server.Api.Models.Data;
-using Prospect.Server.Api.Services.UserData;
-using System.Text.Json;
+using Microsoft.AspNetCore.SignalR;
+using Prospect.Server.Api.Hubs;
+using System.Collections.Concurrent;
 
-namespace Prospect.Server.Api.Services.Squad;
-
-public class SquadService
+namespace Prospect.Server.Api.Services.Squad
 {
-    private readonly ILogger<SquadService> _logger;
-    private readonly UserDataService _userDataService;
-    private readonly TitleDataService _titleDataService;
-    
-    // Dictionary to store active squads in memory
-    private readonly Dictionary<string, SquadData> _activeSquads = new();
-
-    public SquadService(ILogger<SquadService> logger, UserDataService userDataService, TitleDataService titleDataService)
+    public class SquadService
     {
-        _logger = logger;
-        _userDataService = userDataService;
-        _titleDataService = titleDataService;
-    }
+        private readonly ILogger<SquadService> _logger;
+        private readonly IHubContext<CycleHub> _hubContext;
+        private readonly Services.UserData.UserDataService _userDataService;
+        
+        // Using ConcurrentDictionary for thread safety
+        private readonly ConcurrentDictionary<string, SquadData> _squads = new();
+        private readonly ConcurrentDictionary<string, PlayerSquadState> _playerSquadStates = new();
 
-    // Create a new squad with the given leader
-    public async Task<SquadData> CreateSquadAsync(string leaderId, string displayName)
-    {
-        var squad = new SquadData
+        public SquadService(
+            ILogger<SquadService> logger,
+            IHubContext<CycleHub> hubContext,
+            Services.UserData.UserDataService userDataService)
         {
-            LeaderId = leaderId,
-            Members = new List<SquadMember>
+            _logger = logger;
+            _hubContext = hubContext;
+            _userDataService = userDataService;
+        }
+
+        public async Task<SquadData> CreateSquadAsync(string leaderId, string leaderDisplayName)
+        {
+            _logger.LogInformation("Creating squad for leader {LeaderId}", leaderId);
+            
+            // Check if player is already in a squad
+            var existingSquad = await GetPlayerSquadAsync(leaderId);
+            if (existingSquad != null)
             {
-                new SquadMember
-                {
-                    UserId = leaderId,
-                    DisplayName = displayName,
-                    IsReady = false
-                }
+                _logger.LogInformation("Player {LeaderId} is already in squad {SquadId}", leaderId, existingSquad.SquadId);
+                return existingSquad;
             }
-        };
-
-        // Store the squad in memory
-        _activeSquads[squad.SquadId] = squad;
-
-        // Update the player's squad state
-        await UpdatePlayerSquadStateAsync(leaderId, squad.SquadId);
-
-        return squad;
-    }
-
-    // Get a squad by ID
-    public SquadData GetSquad(string squadId)
-    {
-        if (_activeSquads.TryGetValue(squadId, out var squad))
-        {
+            
+            // Create new squad
+            var squad = new SquadData
+            {
+                SquadId = Guid.NewGuid().ToString(),
+                LeaderId = leaderId,
+                Members = new List<SquadMember>
+                {
+                    new SquadMember
+                    {
+                        UserId = leaderId,
+                        DisplayName = leaderDisplayName,
+                        IsConnected = true
+                    }
+                }
+            };
+            
+            // Store the squad
+            _squads[squad.SquadId] = squad;
+            
+            // Update player's squad state
+            var playerState = await GetPlayerSquadStateAsync(leaderId);
+            playerState.SquadId = squad.SquadId;
+            await SavePlayerSquadStateAsync(leaderId, playerState);
+            
+            _logger.LogInformation("Created squad {SquadId} for leader {LeaderId}", squad.SquadId, leaderId);
+            
             return squad;
         }
 
-        return null;
-    }
-
-    // Add a player to a squad
-    public async Task<bool> AddPlayerToSquadAsync(string squadId, string userId, string displayName)
-    {
-        if (!_activeSquads.TryGetValue(squadId, out var squad))
+        public SquadData GetSquad(string squadId)
         {
-            return false;
+            // Handle null or empty squad ID
+            if (string.IsNullOrEmpty(squadId) || squadId == "_")
+            {
+                _logger.LogInformation("GetSquad called with null or empty squad ID");
+                return null;
+            }
+
+            // Try to get the squad
+            _squads.TryGetValue(squadId, out var squad);
+            return squad;
         }
-
-        // Check if the player is already in the squad
-        if (squad.Members.Any(m => m.UserId == userId))
+        
+        public async Task<SquadData> GetPlayerSquadAsync(string userId)
         {
+            var playerState = await GetPlayerSquadStateAsync(userId);
+            if (string.IsNullOrEmpty(playerState.SquadId))
+            {
+                return null;
+            }
+            
+            return GetSquad(playerState.SquadId);
+        }
+        
+        // Method used by GetSquadInvites.cs
+        public async Task<List<SquadInvite>> GetPlayerSquadInvitesAsync(string userId)
+        {
+            var playerState = await GetPlayerSquadStateAsync(userId);
+            return playerState.Invites;
+        }
+        
+        // Method used by InviteToSquad.cs - updated to support 4 parameters
+        public async Task<SquadInvite> CreateSquadInviteAsync(string fromUserId, string toUserId, string fromUserDisplayName, string toUserDisplayName)
+        {
+            var fromPlayerState = await GetPlayerSquadStateAsync(fromUserId);
+            if (string.IsNullOrEmpty(fromPlayerState.SquadId))
+            {
+                return null;
+            }
+            
+            var squad = GetSquad(fromPlayerState.SquadId);
+            if (squad == null)
+            {
+                return null;
+            }
+            
+            // Check if user is already in this squad
+            if (squad.Members.Any(m => m.UserId == toUserId))
+            {
+                return null;
+            }
+            
+            // Create invite
+            var invite = new SquadInvite
+            {
+                InviteId = Guid.NewGuid().ToString(),
+                FromUserId = fromUserId,
+                FromDisplayName = fromUserDisplayName,
+                ToUserId = toUserId,
+                SquadId = squad.SquadId,
+                CreatedAt = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+            };
+            
+            // Add invite to target player's state
+            var toPlayerState = await GetPlayerSquadStateAsync(toUserId);
+            toPlayerState.Invites.Add(invite);
+            await SavePlayerSquadStateAsync(toUserId, toPlayerState);
+            
+            // Notify target player of invite via SignalR
+            var connectionId = CycleHub.GetConnectionIdForUser(toUserId);
+            if (!string.IsNullOrEmpty(connectionId))
+            {
+                await _hubContext.Clients.Client(connectionId).SendAsync("SquadInviteReceived", new
+                {
+                    InviteId = invite.InviteId,
+                    FromUserId = invite.FromUserId,
+                    FromDisplayName = invite.FromDisplayName,
+                    SquadId = invite.SquadId
+                });
+            }
+            
+            return invite;
+        }
+        
+        // Method used by LeaveSquad.cs - updated to support 2 parameters
+        public async Task<bool> RemovePlayerFromSquadAsync(string userId, string squadId)
+        {
+            PlayerSquadState userState;
+            
+            // If squadId is not provided, get it from player state
+            if (string.IsNullOrEmpty(squadId))
+            {
+                userState = await GetPlayerSquadStateAsync(userId);
+                squadId = userState.SquadId;
+                
+                if (string.IsNullOrEmpty(squadId))
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                // Get player state
+                userState = await GetPlayerSquadStateAsync(userId);
+            }
+            
+            var squad = GetSquad(squadId);
+            if (squad == null)
+            {
+                return false;
+            }
+            
+            // Remove member from squad
+            var member = squad.Members.FirstOrDefault(m => m.UserId == userId);
+            if (member != null)
+            {
+                squad.Members.Remove(member);
+            }
+            
+            // Clear player squad ID
+            userState.SquadId = "";
+            await SavePlayerSquadStateAsync(userId, userState);
+            
+            // If this was the leader, assign a new leader or delete the squad
+            if (userId == squad.LeaderId)
+            {
+                if (squad.Members.Count > 0)
+                {
+                    squad.LeaderId = squad.Members[0].UserId;
+                }
+                else
+                {
+                    _squads.TryRemove(squad.SquadId, out _);
+                    return true;
+                }
+            }
+            
+            // Notify remaining squad members
+            await NotifySquadUpdatedAsync(squad);
+            
             return true;
         }
-
-        // Add the player to the squad
-        squad.Members.Add(new SquadMember
+        
+        // Method used by SquadMemberReadyForMatch.cs
+        public bool SetPlayerReady(string squadId, string userId, bool isReady)
         {
-            UserId = userId,
-            DisplayName = displayName,
-            IsReady = false
-        });
-
-        // Update the player's squad state
-        await UpdatePlayerSquadStateAsync(userId, squadId);
-
-        return true;
-    }
-
-    // Remove a player from a squad
-    public async Task<bool> RemovePlayerFromSquadAsync(string squadId, string userId)
-    {
-        if (!_activeSquads.TryGetValue(squadId, out var squad))
-        {
-            return false;
-        }
-
-        // Remove the player from the squad
-        var member = squad.Members.FirstOrDefault(m => m.UserId == userId);
-        if (member == null)
-        {
-            return false;
-        }
-
-        squad.Members.Remove(member);
-
-        // Update the player's squad state
-        await UpdatePlayerSquadStateAsync(userId, "");
-
-        // If there are no members left, delete the squad
-        if (squad.Members.Count == 0)
-        {
-            _activeSquads.Remove(squadId);
+            var squad = GetSquad(squadId);
+            if (squad == null)
+            {
+                _logger.LogWarning("SetPlayerReady: Squad {SquadId} not found", squadId);
+                return false;
+            }
+            
+            var member = squad.Members.FirstOrDefault(m => m.UserId == userId);
+            if (member == null)
+            {
+                _logger.LogWarning("SetPlayerReady: Member {UserId} not found in squad {SquadId}", userId, squadId);
+                return false;
+            }
+            
+            member.IsReady = isReady;
+            
+            // Check if all members are ready
+            squad.AllReady = squad.Members.All(m => m.IsReady);
+            
+            // Notify squad members
+            NotifySquadUpdatedAsync(squad).Wait();
+            
             return true;
         }
-
-        // If the leader left, assign a new leader
-        if (squad.LeaderId == userId && squad.Members.Count > 0)
-        {
-            squad.LeaderId = squad.Members[0].UserId;
-        }
-
-        return true;
-    }
-
-    // Set a player's ready status
-    public bool SetPlayerReady(string squadId, string userId, bool isReady)
-    {
-        if (!_activeSquads.TryGetValue(squadId, out var squad))
-        {
-            return false;
-        }
-
-        var member = squad.Members.FirstOrDefault(m => m.UserId == userId);
-        if (member == null)
-        {
-            return false;
-        }
-
-        member.IsReady = isReady;
-
-        // Check if all members are ready
-        squad.AllReady = squad.Members.All(m => m.IsReady);
-
-        return true;
-    }
-
-    // Set a player's deploy flow status
-    public bool SetPlayerInDeployFlow(string squadId, string userId, bool isInDeployFlow)
-    {
-        if (!_activeSquads.TryGetValue(squadId, out var squad))
-        {
-            return false;
-        }
-
-        var member = squad.Members.FirstOrDefault(m => m.UserId == userId);
-        if (member == null)
-        {
-            return false;
-        }
-
-        member.IsInDeployFlow = isInDeployFlow;
-
-        // If any member is in deploy flow, the squad is in deploy flow
-        squad.InDeployFlow = squad.Members.Any(m => m.IsInDeployFlow);
-
-        return true;
-    }
-
-    // Set the map for a squad
-    public bool SetSquadMap(string squadId, string mapName)
-    {
-        if (!_activeSquads.TryGetValue(squadId, out var squad))
-        {
-            return false;
-        }
-
-        squad.MapName = mapName;
-        return true;
-    }
-
-    // Start matchmaking for a squad
-    public bool StartMatchmaking(string squadId)
-    {
-        if (!_activeSquads.TryGetValue(squadId, out var squad))
-        {
-            return false;
-        }
-
-        squad.MatchmakingState = 1; // Matchmaking
-        return true;
-    }
-
-    // Complete matchmaking for a squad
-    public bool CompleteMatchmaking(string squadId, string sessionId)
-    {
-        if (!_activeSquads.TryGetValue(squadId, out var squad))
-        {
-            return false;
-        }
-
-        squad.MatchmakingState = 2; // Matched
-        squad.SessionId = sessionId;
-        return true;
-    }
-
-    // Create a squad invite
-    public async Task<SquadInvite> CreateSquadInviteAsync(string fromUserId, string fromDisplayName, string toUserId, string squadId)
-    {
-        // Check if the squad exists
-        if (!_activeSquads.TryGetValue(squadId, out _))
-        {
-            return null;
-        }
-
-        // Create the invite
-        var invite = new SquadInvite
-        {
-            FromUserId = fromUserId,
-            FromDisplayName = fromDisplayName,
-            ToUserId = toUserId,
-            SquadId = squadId
-        };
-
-        // Store the invite in the target player's data
-        var userData = await _userDataService.FindAsync(toUserId, toUserId, new List<string> { "SquadState" });
         
-        PlayerSquadState squadState;
-        if (!userData.TryGetValue("SquadState", out var squadStateData))
+        // Method used by SquadMemberSelectedMap.cs
+        public bool SetSquadMap(string squadId, string mapName)
         {
-            squadState = new PlayerSquadState();
+            var squad = GetSquad(squadId);
+            if (squad == null)
+            {
+                _logger.LogWarning("SetSquadMap: Squad {SquadId} not found", squadId);
+                return false;
+            }
+            
+            squad.MapName = mapName;
+            
+            // Notify squad members
+            NotifySquadUpdatedAsync(squad).Wait();
+            
+            return true;
         }
-        else
-        {
-            squadState = JsonSerializer.Deserialize<PlayerSquadState>(squadStateData.Value);
-        }
-
-        squadState.Invites.Add(invite);
-
-        await _userDataService.UpdateAsync(
-            toUserId, 
-            toUserId,
-            new Dictionary<string, string> { ["SquadState"] = JsonSerializer.Serialize(squadState) }
-        );
-
-        return invite;
-    }
-
-    // Accept a squad invite
-    public async Task<bool> AcceptSquadInviteAsync(string userId, string inviteId)
-    {
-        // Get the player's squad state
-        var userData = await _userDataService.FindAsync(userId, userId, new List<string> { "SquadState" });
         
-        if (!userData.TryGetValue("SquadState", out var squadStateData))
+        // Method used by SquadMemberStartingDeployFlow.cs
+        public bool SetPlayerInDeployFlow(string squadId, string userId, bool inDeployFlow)
         {
-            return false;
+            var squad = GetSquad(squadId);
+            if (squad == null)
+            {
+                _logger.LogWarning("SetPlayerInDeployFlow: Squad {SquadId} not found", squadId);
+                return false;
+            }
+            
+            var member = squad.Members.FirstOrDefault(m => m.UserId == userId);
+            if (member == null)
+            {
+                _logger.LogWarning("SetPlayerInDeployFlow: Member {UserId} not found in squad {SquadId}", userId, squadId);
+                return false;
+            }
+            
+            member.IsInDeployFlow = inDeployFlow;
+            
+            // Update squad deploy flow state if all members are in deploy flow
+            squad.InDeployFlow = squad.Members.All(m => m.IsInDeployFlow);
+            
+            // Notify squad members
+            NotifySquadUpdatedAsync(squad).Wait();
+            
+            return true;
         }
-
-        var squadState = JsonSerializer.Deserialize<PlayerSquadState>(squadStateData.Value);
-        var invite = squadState.Invites.FirstOrDefault(i => i.InviteId == inviteId);
         
-        if (invite == null)
+        public async Task<bool> AcceptSquadInviteAsync(string userId, string inviteId)
         {
-            return false;
+            var playerState = await GetPlayerSquadStateAsync(userId);
+            
+            // Find the invite
+            var invite = playerState.Invites.FirstOrDefault(i => i.InviteId == inviteId);
+            if (invite == null)
+            {
+                _logger.LogWarning("Invite {InviteId} not found for user {UserId}", inviteId, userId);
+                return false;
+            }
+            
+            // Get the squad
+            var squad = GetSquad(invite.SquadId);
+            if (squad == null)
+            {
+                _logger.LogWarning("Squad {SquadId} not found for invite {InviteId}", invite.SquadId, inviteId);
+                return false;
+            }
+            
+            // Get user data for display name
+            var userData = await _userDataService.FindAsync(userId, userId, new List<string> { "DisplayName" });
+            string displayName = "Player";
+            if (userData.TryGetValue("DisplayName", out var displayNameData))
+            {
+                displayName = displayNameData.Value;
+            }
+            
+            // Add member to squad
+            squad.Members.Add(new SquadMember
+            {
+                UserId = userId,
+                DisplayName = displayName,
+                IsConnected = true
+            });
+            
+            // Update player squad state
+            playerState.SquadId = squad.SquadId;
+            playerState.Invites.Remove(invite);
+            await SavePlayerSquadStateAsync(userId, playerState);
+            
+            // Notify squad members
+            await NotifySquadUpdatedAsync(squad);
+            
+            return true;
         }
-
-        // Remove the invite
-        squadState.Invites.Remove(invite);
-
-        // Get user display name
-        var userProfile = await _userDataService.FindAsync(userId, userId, new List<string> { "DisplayName" });
-        string displayName = "Player";
-        if (userProfile.TryGetValue("DisplayName", out var displayNameData))
-        {
-            displayName = displayNameData.Value;
-        }
-
-        // Add the player to the squad
-        var success = await AddPlayerToSquadAsync(invite.SquadId, userId, displayName);
         
-        // Update the player's squad state
-        await _userDataService.UpdateAsync(
-            userId, 
-            userId,
-            new Dictionary<string, string> { ["SquadState"] = JsonSerializer.Serialize(squadState) }
-        );
-
-        return success;
-    }
-
-    // Decline a squad invite
-    public async Task<bool> DeclineSquadInviteAsync(string userId, string inviteId)
-    {
-        // Get the player's squad state
-        var userData = await _userDataService.FindAsync(userId, userId, new List<string> { "SquadState" });
+        public async Task<bool> DeclineSquadInviteAsync(string userId, string inviteId)
+        {
+            var playerState = await GetPlayerSquadStateAsync(userId);
+            
+            // Find and remove the invite
+            var invite = playerState.Invites.FirstOrDefault(i => i.InviteId == inviteId);
+            if (invite == null)
+            {
+                return false;
+            }
+            
+            playerState.Invites.Remove(invite);
+            await SavePlayerSquadStateAsync(userId, playerState);
+            
+            return true;
+        }
         
-        if (!userData.TryGetValue("SquadState", out var squadStateData))
+        public async Task<bool> LeaveSquadAsync(string userId)
         {
-            return false;
+            return await RemovePlayerFromSquadAsync(userId, null);
         }
-
-        var squadState = JsonSerializer.Deserialize<PlayerSquadState>(squadStateData.Value);
-        var invite = squadState.Invites.FirstOrDefault(i => i.InviteId == inviteId);
         
-        if (invite == null)
+        public async Task<SquadInvite> InviteToSquadAsync(string fromUserId, string toUserId)
         {
-            return false;
+            // Get inviter display name
+            var userData = await _userDataService.FindAsync(fromUserId, fromUserId, new List<string> { "DisplayName" });
+            string fromDisplayName = "Player";
+            if (userData.TryGetValue("DisplayName", out var displayNameData))
+            {
+                fromDisplayName = displayNameData.Value;
+            }
+            
+            return await CreateSquadInviteAsync(fromUserId, toUserId, fromDisplayName, "");
         }
-
-        // Remove the invite
-        squadState.Invites.Remove(invite);
-
-        // Update the player's squad state
-        await _userDataService.UpdateAsync(
-            userId, 
-            userId,
-            new Dictionary<string, string> { ["SquadState"] = JsonSerializer.Serialize(squadState) }
-        );
-
-        return true;
-    }
-
-    // Helper method to update a player's squad state
-    private async Task UpdatePlayerSquadStateAsync(string userId, string squadId)
-    {
-        var userData = await _userDataService.FindAsync(userId, userId, new List<string> { "SquadState" });
         
-        PlayerSquadState squadState;
-        if (!userData.TryGetValue("SquadState", out var squadStateData))
+        public void StartMatchmaking(string squadId)
         {
-            squadState = new PlayerSquadState();
+            if (string.IsNullOrEmpty(squadId) || squadId == "_")
+            {
+                _logger.LogInformation("StartMatchmaking called with invalid squad ID: {SquadId}", squadId);
+                return;
+            }
+            
+            var squad = GetSquad(squadId);
+            if (squad == null)
+            {
+                _logger.LogWarning("StartMatchmaking: Squad {SquadId} not found", squadId);
+                return;
+            }
+            
+            _logger.LogInformation("Starting matchmaking for squad {SquadId}", squadId);
+            squad.MatchmakingState = 1; // 1 = matchmaking
         }
-        else
-        {
-            squadState = JsonSerializer.Deserialize<PlayerSquadState>(squadStateData.Value);
-        }
-
-        squadState.SquadId = squadId;
-
-        await _userDataService.UpdateAsync(
-            userId, 
-            userId,
-            new Dictionary<string, string> { ["SquadState"] = JsonSerializer.Serialize(squadState) }
-        );
-    }
-
-    // Get a player's squad
-    public async Task<SquadData> GetPlayerSquadAsync(string userId)
-    {
-        var userData = await _userDataService.FindAsync(userId, userId, new List<string> { "SquadState" });
         
-        if (!userData.TryGetValue("SquadState", out var squadStateData))
+        public void CompleteMatchmaking(string squadId, string sessionId)
         {
-            return null;
+            if (string.IsNullOrEmpty(squadId) || squadId == "_")
+            {
+                _logger.LogInformation("CompleteMatchmaking called with invalid squad ID: {SquadId}", squadId);
+                return;
+            }
+            
+            var squad = GetSquad(squadId);
+            if (squad == null)
+            {
+                _logger.LogWarning("CompleteMatchmaking: Squad {SquadId} not found", squadId);
+                return;
+            }
+            
+            _logger.LogInformation("Completing matchmaking for squad {SquadId} with session {SessionId}", squadId, sessionId);
+            squad.MatchmakingState = 2; // 2 = matched
+            squad.SessionId = sessionId;
         }
-
-        var squadState = JsonSerializer.Deserialize<PlayerSquadState>(squadStateData.Value);
         
-        if (string.IsNullOrEmpty(squadState.SquadId))
+        private async Task<PlayerSquadState> GetPlayerSquadStateAsync(string userId)
         {
-            return null;
+            // Check if we already have it in memory
+            if (_playerSquadStates.TryGetValue(userId, out var state))
+            {
+                return state;
+            }
+            
+            // Try to load from user data
+            try
+            {
+                var userData = await _userDataService.FindAsync(userId, userId, new List<string> { "SquadState" });
+                if (userData.TryGetValue("SquadState", out var squadStateData))
+                {
+                    state = System.Text.Json.JsonSerializer.Deserialize<PlayerSquadState>(squadStateData.Value);
+                    if (state != null)
+                    {
+                        _playerSquadStates[userId] = state;
+                        return state;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error loading player squad state for {UserId}", userId);
+            }
+            
+            // Create new state
+            state = new PlayerSquadState();
+            _playerSquadStates[userId] = state;
+            return state;
         }
-
-        return GetSquad(squadState.SquadId);
-    }
-
-    // Get a player's squad invites
-    public async Task<List<SquadInvite>> GetPlayerSquadInvitesAsync(string userId)
-    {
-        var userData = await _userDataService.FindAsync(userId, userId, new List<string> { "SquadState" });
         
-        if (!userData.TryGetValue("SquadState", out var squadStateData))
+        private async Task SavePlayerSquadStateAsync(string userId, PlayerSquadState state)
         {
-            return new List<SquadInvite>();
+            // Update in memory
+            _playerSquadStates[userId] = state;
+            
+            // Save to user data
+            try
+            {
+                await _userDataService.UpdateAsync(
+                    userId, 
+                    userId, 
+                    new Dictionary<string, string> { 
+                        ["SquadState"] = System.Text.Json.JsonSerializer.Serialize(state) 
+                    }
+                );
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error saving player squad state for {UserId}", userId);
+            }
         }
-
-        var squadState = JsonSerializer.Deserialize<PlayerSquadState>(squadStateData.Value);
-        return squadState.Invites;
+        
+        private async Task NotifySquadUpdatedAsync(SquadData squad)
+        {
+            foreach (var member in squad.Members)
+            {
+                var connectionId = CycleHub.GetConnectionIdForUser(member.UserId);
+                if (!string.IsNullOrEmpty(connectionId))
+                {
+                    await _hubContext.Clients.Client(connectionId).SendAsync("SquadUpdated", squad);
+                }
+            }
+        }
     }
 }
