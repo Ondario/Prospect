@@ -7,9 +7,9 @@ namespace Prospect.Server.Api.Services.CloudScript.Functions;
 [CloudScriptFunction("GetSignalRConnection")]
 public class GetSignalRConnection : ICloudScriptFunction<FYGetSignalRConnection, FYGetSignalRConnectionResult>
 {
-    private readonly PlayFabSettings _settings;
+    private readonly SignalRSettings _settings;
 
-    public GetSignalRConnection(IOptions<PlayFabSettings> settings)
+    public GetSignalRConnection(IOptions<SignalRSettings> settings)
     {
         _settings = settings.Value;
     }

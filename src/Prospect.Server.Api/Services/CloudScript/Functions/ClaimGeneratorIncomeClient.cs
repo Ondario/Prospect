@@ -43,9 +43,9 @@ public class ClaimGeneratorIncomeClient : ICloudScriptFunction<FYClaimGeneratorI
 
     static readonly Random random = new();
 
-    private TitleDataDailyCrateInfo[] PickItems(TitleDataDailyCrateInfo[] items, int numPicks)
+    private TitleDataDailyCrateInfoPoolItem[] PickItems(TitleDataDailyCrateInfoPoolItem[] items, int numPicks)
     {
-        var itemList = new (TitleDataDailyCrateInfo item, float cumulativeWeight)[items.Length];
+        var itemList = new (TitleDataDailyCrateInfoPoolItem item, float cumulativeWeight)[items.Length];
         float totalWeight = 0;
 
         for (int i = 0; i < items.Length; i++) {
@@ -54,7 +54,7 @@ public class ClaimGeneratorIncomeClient : ICloudScriptFunction<FYClaimGeneratorI
             itemList[i] = (item, totalWeight);
         }
 
-        var selectedItems = new TitleDataDailyCrateInfo[numPicks];
+        var selectedItems = new TitleDataDailyCrateInfoPoolItem[numPicks];
 
         for (int i = 0; i < numPicks; i++) {
             float pick = (float)random.NextDouble() * totalWeight;
@@ -108,7 +108,7 @@ public class ClaimGeneratorIncomeClient : ICloudScriptFunction<FYClaimGeneratorI
         var inventory = JsonSerializer.Deserialize<List<FYCustomItemInfo>>(userData["Inventory"].Value);
         var techTreeBonuses = JsonSerializer.Deserialize<CharacterTechTreeBonuses>(userData["CharacterTechTreeBonuses"].Value);
 
-        var titleData = _titleDataService.Find(new List<string>{"PassiveGenerators", "DailyCrateRewardsPools", "Blueprints"});
+        var titleData = _titleDataService.Find(new List<string>{"PassiveGenerators", "DailyCrateSetups", "Blueprints"});
         var passiveGenerators = JsonSerializer.Deserialize<Dictionary<string, TitleDataPassiveGeneratorsInfo>>(titleData["PassiveGenerators"]);
 
         var now = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
@@ -187,31 +187,32 @@ public class ClaimGeneratorIncomeClient : ICloudScriptFunction<FYClaimGeneratorI
                     };
                 }
 
-                var dailyCrateRewards = JsonSerializer.Deserialize<TitleDataDailyCrateInfo[][]>(titleData["DailyCrateRewardsPools"]);
+                var dailyCrateSetups = JsonSerializer.Deserialize<TitleDataDailyCrateInfo[]>(titleData["DailyCrateSetups"]);
                 var blueprints = JsonSerializer.Deserialize<Dictionary<string, TitleDataBlueprintInfo>>(titleData["Blueprints"]);
-                var rewardsPool = dailyCrateRewards[crateTier - 1];
+                var rewardsPool = dailyCrateSetups[crateTier - 1];
 
-                // TODO: Get rewardGrants from PassiveGenerators_CrateRewards_DT
-                var items = PickItems(rewardsPool, 5);
-                // TODO: Stackable? GrantedItems doesn't imply granted OR updated.
-                foreach (var item in items) {
-                    var itemInfo = blueprints[item.Name];
-                    var grantedItem = new FYCustomItemInfo {
-                        ItemId = Guid.NewGuid().ToString(),
-                        Amount = item.Amount,
-                        BaseItemId = item.Name,
-                        Durability = itemInfo.DurabilityMax,
-                        Insurance = "",
-                        InsuranceOwnerPlayfabId = "",
-                        ModData = new FYModItems { M = [] },
-                        Origin = new FYItemOriginBackend { G = "", P = "", T = "" },
-                        InsuredAttachmentId = "",
-                        PrimaryVanityId = 0,
-                        SecondaryVanityId = 0,
-                        RolledPerks = [],
-                    };
-                    inventory.Add(grantedItem);
-                    grantedItems.Add(grantedItem);
+                foreach (var grant in rewardsPool.RewardGrants) {
+                    var items = PickItems(grant.Pool, grant.Amount);
+                    // TODO: Stackable? GrantedItems doesn't imply granted OR updated.
+                    foreach (var item in items) {
+                        var itemInfo = blueprints[item.Name];
+                        var grantedItem = new FYCustomItemInfo {
+                            ItemId = Guid.NewGuid().ToString(),
+                            Amount = item.Amount,
+                            BaseItemId = item.Name,
+                            Durability = itemInfo.DurabilityMax,
+                            Insurance = "",
+                            InsuranceOwnerPlayfabId = "",
+                            ModData = new FYModItems { M = [] },
+                            Origin = new FYItemOriginBackend { G = "", P = "", T = "" },
+                            InsuredAttachmentId = "",
+                            PrimaryVanityId = 0,
+                            SecondaryVanityId = 0,
+                            RolledPerks = [],
+                        };
+                        inventory.Add(grantedItem);
+                        grantedItems.Add(grantedItem);
+                    }
                 }
                 break;
             }

@@ -50,7 +50,7 @@ public class ClaimActiveContract : ICloudScriptFunction<FYClaimCompletedActiveCo
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly UserDataService _userDataService;
     private readonly TitleDataService _titleDataService;
-    private readonly string[] difficulties = ["Easy", "Medium", "Hard"];
+    private readonly EYContractDifficulty[] difficulties = [EYContractDifficulty.Easy, EYContractDifficulty.Medium, EYContractDifficulty.Hard];
     private readonly Random rnd = new Random();
 
     public ClaimActiveContract(IHttpContextAccessor httpContextAccessor, UserDataService userDataService, TitleDataService titleDataService)
@@ -219,20 +219,19 @@ public class ClaimActiveContract : ICloudScriptFunction<FYClaimCompletedActiveCo
         if (contract.IsMainContract) {
             contractsCompleted.ContractsIDs.Add(contract.Name);
         } else {
-            var parts = contract.Name.Split('-');
-            var difficulty = parts[1];
+            var contractDifficulty = contract.Difficulty;
 
             var levelsData = JsonSerializer.Deserialize<Dictionary<string, int[]>>(titleData["LevelData"]);
             var levels = levelsData[contract.Faction];
-            var jobs = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, string[]>>>(titleData["Jobs"]);
+            var jobs = JsonSerializer.Deserialize<Dictionary<string, Dictionary<EYContractDifficulty, string[]>>>(titleData["Jobs"]);
             var level = levels.Length - Array.FindIndex(levels, (int xp) => {
                 return factionProgression >= xp;
             });
 
             var factionBoard = jobBoardsData.Boards.Find(c => c.FactionId == contract.Faction);
-            var idx = Array.FindIndex(difficulties, d => d == difficulty);
+            var idx = Array.FindIndex(difficulties, d => d == contractDifficulty);
             var factionJobs = jobs[contract.Faction];
-            var jobsAvailable = Array.FindAll(factionJobs[difficulty], (string jobId) => {
+            var jobsAvailable = Array.FindAll(factionJobs[contractDifficulty], (string jobId) => {
                 return level >= contracts[jobId].UnlockData.Level;
             });
             // If player completes a job, it means he has at least one unlocked anyway.

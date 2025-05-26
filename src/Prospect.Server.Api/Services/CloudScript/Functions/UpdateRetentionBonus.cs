@@ -43,9 +43,9 @@ public class UpdateRetentionBonus : ICloudScriptFunction<FYRetentionBonusRequest
             };
         }
 
-        var now = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        var nextClaimTime = retentionBonus.LastClaimTime.Seconds + 60 * 60 * 24 * 2;
-        if (now < nextClaimTime) {
+        var currentMidnight = (int)new DateTimeOffset(DateTime.UtcNow.Date, TimeSpan.Zero).ToUnixTimeSeconds();
+        var nextClaimTime = retentionBonus.LastClaimTime.Seconds + 60 * 60 * 24;
+        if (currentMidnight < nextClaimTime) {
             return new FYRetentionBonusResult
             {
                 UserId = userId,
@@ -58,7 +58,7 @@ public class UpdateRetentionBonus : ICloudScriptFunction<FYRetentionBonusRequest
         var bonusData = JsonSerializer.Deserialize<Dictionary<string, TitleDataRetentionBonusInfo>>(titleData["RetentionBonusData"]);
 
         retentionBonus.DaysClaimed++;
-        retentionBonus.LastClaimTime.Seconds = now;
+        retentionBonus.LastClaimTime.Seconds = currentMidnight;
         retentionBonus.ClaimedAll = retentionBonus.DaysClaimed >= 14;
 
         // TODO: Currently only CB2 bonuses are considered

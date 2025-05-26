@@ -15,8 +15,8 @@ public class TitleDataContractInfo {
     public TitleDataContractInfoUnlockData UnlockData { get; set; }
     [JsonPropertyName("IsMainContract")]
     public bool IsMainContract { get; set; }
-    [JsonPropertyName("ContractDifficulty")]
-    public EYContractDifficulty ContractDifficulty { get; set; }
+    [JsonPropertyName("Difficulty")]
+    public EYContractDifficulty Difficulty { get; set; }
 }
 
 public class TitleDataContractInfoReward {

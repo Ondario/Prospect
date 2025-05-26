@@ -1,4 +1,6 @@
 ﻿using System.Text.Json.Serialization;
+using Microsoft.Extensions.Options;
+using Prospect.Server.Api.Config;
 using Prospect.Server.Api.Services.CloudScript.Models;
 
 namespace Prospect.Server.Api.Services.CloudScript.Functions;
@@ -27,6 +29,13 @@ public class FYVivoxJoinTokenRequest
 [CloudScriptFunction("VivoxJoin")]
 public class VivoxJoin : ICloudScriptFunction<FYVivoxJoinTokenRequest, object>
 {
+    private readonly VivoxConfig _settings;
+
+    public VivoxJoin(IOptions<VivoxConfig> settings)
+    {
+        _settings = settings.Value;
+    }
+
     private int ReturnChannelType(string type) {
         switch (type) {
             case "GLOBAL": return 2;
@@ -41,8 +50,7 @@ public class VivoxJoin : ICloudScriptFunction<FYVivoxJoinTokenRequest, object>
     public async Task<object> ExecuteAsync(FYVivoxJoinTokenRequest request)
     {
         var exp = (int)DateTimeOffset.UtcNow.AddDays(1).ToUnixTimeSeconds();
-        // TODO: Replace with app configuration
-        var token = TokenGenerator.vxGenerateToken("key", "issuer", exp, "join", request.Username, request.Channel);
+        var token = TokenGenerator.vxGenerateToken(_settings.Key, _settings.Issuer, exp, "join", request.Username, request.Channel);
 
         return new FYVivoxJoinData
         {

@@ -16,7 +16,7 @@ public class RequestActiveObjectivesAndBoardsData : ICloudScriptFunction<FYQuery
     private readonly UserDataService _userDataService;
     private readonly TitleDataService _titleDataService;
     private readonly string[] factions = ["Korolev", "Osiris", "ICA"]; // TODO: Order is important
-    private readonly string[] difficulties = ["Easy", "Medium", "Hard"];
+    private readonly EYContractDifficulty[] difficulties = [EYContractDifficulty.Easy, EYContractDifficulty.Medium, EYContractDifficulty.Hard];
     private readonly Random rnd = new Random();
 
     public RequestActiveObjectivesAndBoardsData(IHttpContextAccessor httpContextAccessor, UserDataService userDataService, TitleDataService titleDataService)
@@ -47,22 +47,20 @@ public class RequestActiveObjectivesAndBoardsData : ICloudScriptFunction<FYQuery
             var titleData = _titleDataService.Find(new List<string> { "Contracts", "Jobs", "LevelData" });
 
             var contracts = JsonSerializer.Deserialize<Dictionary<string, TitleDataContractInfo>>(titleData["Contracts"]);
-            var jobs = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, string[]>>>(titleData["Jobs"]);
+            var jobs = JsonSerializer.Deserialize<Dictionary<string, Dictionary<EYContractDifficulty, string[]>>>(titleData["Jobs"]);
             var levelsData = JsonSerializer.Deserialize<Dictionary<string, int[]>>(titleData["LevelData"]);
-            var currentQuests = new Dictionary<string, Dictionary<string, bool>> { 
-                ["Korolev"] = new Dictionary<string, bool> { ["Easy"] = false, ["Medium"] = false, ["Hard"] = false },
-                ["Osiris"] = new Dictionary<string, bool> { ["Easy"] = false, ["Medium"] = false, ["Hard"] = false },
-                ["ICA"] = new Dictionary<string, bool> { ["Easy"] = false, ["Medium"] = false, ["Hard"] = false },
+            var currentQuests = new Dictionary<string, Dictionary<EYContractDifficulty, bool>> {
+                ["Korolev"] = new Dictionary<EYContractDifficulty, bool> { [EYContractDifficulty.Easy] = false, [EYContractDifficulty.Medium] = false, [EYContractDifficulty.Hard] = false },
+                ["Osiris"] = new Dictionary<EYContractDifficulty, bool> { [EYContractDifficulty.Easy] = false, [EYContractDifficulty.Medium] = false, [EYContractDifficulty.Hard] = false },
+                ["ICA"] = new Dictionary<EYContractDifficulty, bool> { [EYContractDifficulty.Easy] = false, [EYContractDifficulty.Medium] = false, [EYContractDifficulty.Hard] = false },
             };
 
             foreach (var contract in contractsActive.Contracts) {
-                var parts = contract.ContractID.Split('-');
-                if (parts[0] != "NEW") {
+                var contractData = contracts[contract.ContractID];
+                if (contractData.IsMainContract) {
                     continue;
                 }
-                var difficulty = parts[1];
-                var faction = parts[2] == "KOR" ? "Korolev" : parts[2];
-                currentQuests[faction][difficulty] = true;
+                currentQuests[contractData.Faction][contractData.Difficulty] = true;
             }
 
             for (var i = 0; i < factions.Length; i++) {

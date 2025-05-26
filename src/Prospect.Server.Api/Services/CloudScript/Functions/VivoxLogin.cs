@@ -1,4 +1,6 @@
-﻿using Prospect.Server.Api.Services.CloudScript.Models;
+﻿using Microsoft.Extensions.Options;
+using Prospect.Server.Api.Config;
+using Prospect.Server.Api.Services.CloudScript.Models;
 using System.Security.Cryptography;
 using System.Text.Json;
 
@@ -84,12 +86,18 @@ public class TokenGenerator
 [CloudScriptFunction("VivoxLogin")]
 public class VivoxLogin : ICloudScriptFunction<FYVivoxLoginTokenRequest, FYVivoxJoinData>
 {
+    private readonly VivoxConfig _settings;
+
+    public VivoxLogin(IOptions<VivoxConfig> settings)
+    {
+        _settings = settings.Value;
+    }
+
     public async Task<FYVivoxJoinData> ExecuteAsync(FYVivoxLoginTokenRequest request)
     {
-        // TODO: Replace with app configuration
-        var channel = "sip:confctl-g-<issuer>.testchannel@mtu1xp.vivox.com"; // e - echo channel, g - global, p - positional
+        var channel = $"sip:confctl-g-{_settings.Issuer}.testchannel@mtu1xp.vivox.com"; // e - echo channel, g - global, p - positional
         var exp = (int)DateTimeOffset.UtcNow.AddSeconds(90).ToUnixTimeSeconds();
-        var token = TokenGenerator.vxGenerateToken("key", "issuer", exp, "login", request.Username, channel);
+        var token = TokenGenerator.vxGenerateToken(_settings.Key, _settings.Issuer, exp, "login", request.Username, channel);
 
         return new FYVivoxJoinData
         {

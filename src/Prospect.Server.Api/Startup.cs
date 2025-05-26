@@ -25,6 +25,8 @@ public class Startup
         services.Configure<AuthTokenSettings>(Configuration.GetSection(nameof(AuthTokenSettings)));
         services.Configure<DatabaseSettings>(Configuration.GetSection(nameof(DatabaseSettings)));
         services.Configure<PlayFabSettings>(Configuration.GetSection(nameof(PlayFabSettings)));
+        services.Configure<VivoxConfig>(Configuration.GetSection(nameof(VivoxConfig)));
+        services.Configure<SignalRSettings>(Configuration.GetSection(nameof(SignalRSettings)));
 
         services.AddSingleton<AuthTokenService>();
         services.AddSingleton<UserDataService>();
