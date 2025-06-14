@@ -102,11 +102,12 @@ public class EnterMatchmakingMatchFunction : ICloudScriptFunction<FYEnterMatchAz
         {
             Success = true,
             ErrorMessage = "",
-            SingleplayerStation = false,  // CRITICAL: must be false to go to a match
+            SingleplayerStation = false,
             NumAttempts = 1,
             Blocker = 0,
-            IsMatchTravel = true,  // CRITICAL: must be true
-            SessionId = sessionId,
+            IsMatchTravel = true,
+            Address = "127.0.0.1",
+            Port = 7777,
         };
     }
 }

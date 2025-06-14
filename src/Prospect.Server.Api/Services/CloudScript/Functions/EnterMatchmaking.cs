@@ -60,9 +60,9 @@ public class EnterMatchmakingFunction : ICloudScriptFunction<FYEnterMatchAzureFu
             Success = true,
             ErrorMessage = "",
             SingleplayerStation = false,
-            Address = mapName,
-            MaintenanceMode = false,
+            Address = "127.0.0.1",
             Port = 7777,
+            MaintenanceMode = false,
         };
     }
 }

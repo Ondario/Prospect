@@ -1,0 +1,13 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+rules:
+  - description: "Always check ProjectOverview.md before making any code changes."
+    action: "Read and review ProjectOverview.md for current project state, architecture, and module connections."
+  - description: "After any code change, update ProjectOverview.md to reflect new structure, logic, or observations."
+    action: "Summarize changes, update directory tree, module summaries, and multiplayer architecture as needed."
+  - description: "If ProjectOverview.md is missing or outdated, halt work and update it first."
+
+    action: "Regenerate or revise ProjectOverview.md before proceeding."

@@ -20,6 +20,10 @@ public class FYEnterMatchmakingResult
 	public string SessionId { get; set; }
     [JsonPropertyName("errorMessage")]
 	public string ErrorMessage { get; set; }
+    [JsonPropertyName("address")]
+    public string Address { get; set; }
+    [JsonPropertyName("port")]
+    public int Port { get; set; }
 }
 
 public class FYEnterMatchAzureFunctionResult

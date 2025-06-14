@@ -49,7 +49,6 @@ public class EnterMatchmakingStationFunction : ICloudScriptFunction<StationReque
         if (request.IsMatch)
         {
             _logger.LogInformation("[MATCH] Redirecting to game map from station: {MapName}", request.MapName);
-            
             return Task.FromResult(new FYEnterMatchmakingResult
             {
                 Success = true,
@@ -58,7 +57,8 @@ public class EnterMatchmakingStationFunction : ICloudScriptFunction<StationReque
                 NumAttempts = 1,
                 Blocker = 0,
                 IsMatchTravel = true,
-                SessionId = Guid.NewGuid().ToString()
+                Address = "127.0.0.1",
+                Port = 7777,
             });
         }
         
