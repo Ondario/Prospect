@@ -1,54 +1,55 @@
-﻿using Prospect.Unreal.Core;
-using Prospect.Unreal.Runtime;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Prospect.Server.Game.Config;
 using Serilog;
+using Serilog.Events;
 
 namespace Prospect.Server.Game;
 
-internal static class Program
+public class Program
 {
-    private const float TickRate = (1000.0f / 60.0f) / 1000.0f;
-    
-    private static readonly ILogger Logger = Log.ForContext(typeof(Program));
-    private static readonly PeriodicTimer Tick = new PeriodicTimer(TimeSpan.FromSeconds(TickRate));
-    
-    public static async Task Main()
+    public static async Task Main(string[] args)
     {
-        Console.CancelKeyPress += (_, e) =>
-        {
-            Tick.Dispose();
-            e.Cancel = true;
-        };
-        
         Log.Logger = new LoggerConfiguration()
-            .MinimumLevel.Verbose()
+            .MinimumLevel.Debug()
+            .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
             .Enrich.FromLogContext()
-            .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] ({SourceContext,-52}) {Message:lj}{NewLine}{Exception}")
+            .WriteTo.Console()
             .CreateLogger();
-        
-        Logger.Information("Starting Prospect.Server.Game");
 
-        // Prospect:
-        //  Map:        /Game/Maps/MP/Station/Station_P
-        //  GameMode:   /Script/Prospect/YGameMode_Station
-        
-        var worldUrl = new FUrl
+        try
         {
-            Map = "/Game/ThirdPersonCPP/Maps/ThirdPersonExampleMap"
-        };
-        
-        await using (var world = new ProspectWorld())
-        {
-            world.SetGameInstance(new UGameInstance());
-            world.SetGameMode(worldUrl);
-            world.InitializeActorsForPlay(worldUrl, true);
-            world.Listen();
-        
-            while (await Tick.WaitForNextTickAsync())
-            {
-                world.Tick(TickRate);
-            }
+            Log.Information("Starting game server");
+
+            var host = CreateHostBuilder(args).Build();
+            var server = host.Services.GetRequiredService<GameServer>();
+            var settings = host.Services.GetRequiredService<IOptions<GameServerSettings>>().Value;
+
+            // Start the server using configured settings
+            await server.Start(settings.Host, settings.Port);
+
+            await host.RunAsync();
         }
-        
-        Logger.Information("Shutting down");
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "Game server terminated unexpectedly");
+        }
+        finally
+        {
+            Log.CloseAndFlush();
+        }
     }
+
+    private static IHostBuilder CreateHostBuilder(string[] args) =>
+        Host.CreateDefaultBuilder(args)
+            .UseSerilog()
+            .ConfigureServices((hostContext, services) =>
+            {
+                services.Configure<GameServerSettings>(hostContext.Configuration.GetSection("GameServerSettings"));
+                services.Configure<ApiServerSettings>(hostContext.Configuration.GetSection("ApiServerSettings"));
+                services.Configure<SignalRSettings>(hostContext.Configuration.GetSection("SignalRSettings"));
+                services.AddSingleton<GameServer>();
+            });
 }

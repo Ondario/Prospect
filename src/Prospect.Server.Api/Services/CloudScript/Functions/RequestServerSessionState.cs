@@ -1,4 +1,6 @@
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Options;
+using Prospect.Server.Api.Config;
 using Prospect.Server.Api.Services.CloudScript;
 
 public class FYMatchConnectionData {
@@ -38,21 +40,25 @@ public class RequestServerSessionStateResponse
 public class RequestServerSessionStateFunction : ICloudScriptFunction<RequestServerSessionStateRequest, RequestServerSessionStateResponse>
 {
     private readonly ILogger<RequestServerSessionStateFunction> _logger;
+    private readonly MatchServerSettings _matchSettings;
 
-    public RequestServerSessionStateFunction(ILogger<RequestServerSessionStateFunction> logger)
+    public RequestServerSessionStateFunction(
+        ILogger<RequestServerSessionStateFunction> logger,
+        IOptions<MatchServerSettings> matchSettings)
     {
         _logger = logger;
+        _matchSettings = matchSettings.Value;
     }
 
     public async Task<RequestServerSessionStateResponse> ExecuteAsync(RequestServerSessionStateRequest request)
     {
-        _logger.LogInformation("Processing server session state");
+        _logger.LogInformation("Processing server session state for session {SessionId}", request.SessionID);
 
         return new RequestServerSessionStateResponse
         {
             CanGoToSession = true,
             ConnectionData = new FYMatchConnectionData {
-                Addr = request.SessionID, // FIXME: This is for offline use case only!,
+                Addr = $"{_matchSettings.Host}:{_matchSettings.Port}",
                 ConnectSinglePlayer = false,
                 IsMatch = true,
                 ServerID = "testserver",

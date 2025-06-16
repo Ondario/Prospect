@@ -1,6 +1,8 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Options;
+using Prospect.Server.Api.Config;
 using Prospect.Server.Api.Hubs;
 using Prospect.Server.Api.Services.Auth.Extensions;
 using Prospect.Server.Api.Services.CloudScript.Models;
@@ -30,6 +32,7 @@ public class EnterMatchmakingMatchFunction : ICloudScriptFunction<FYEnterMatchAz
     private readonly UserDataService _userDataService;
     private readonly TitleDataService _titleDataService;
     private readonly SquadService _squadService;
+    private readonly MatchServerSettings _matchSettings;
 
     public EnterMatchmakingMatchFunction(
         ILogger<EnterMatchmakingMatchFunction> logger,
@@ -37,6 +40,7 @@ public class EnterMatchmakingMatchFunction : ICloudScriptFunction<FYEnterMatchAz
         IHttpContextAccessor httpContextAccessor, 
         UserDataService userDataService, 
         TitleDataService titleDataService,
+        IOptions<MatchServerSettings> matchSettings,
         SquadService squadService = null)
     {
         _logger = logger;
@@ -45,6 +49,7 @@ public class EnterMatchmakingMatchFunction : ICloudScriptFunction<FYEnterMatchAz
         _userDataService = userDataService;
         _titleDataService = titleDataService;
         _squadService = squadService;
+        _matchSettings = matchSettings.Value;
     }
 
     public async Task<FYEnterMatchmakingResult> ExecuteAsync(FYEnterMatchAzureFunction request)
@@ -106,8 +111,8 @@ public class EnterMatchmakingMatchFunction : ICloudScriptFunction<FYEnterMatchAz
             NumAttempts = 1,
             Blocker = 0,
             IsMatchTravel = true,
-            Address = "127.0.0.1",
-            Port = 7777,
+            Address = _matchSettings.Host,
+            Port = _matchSettings.Port,
         };
     }
 }

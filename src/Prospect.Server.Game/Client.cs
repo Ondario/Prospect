@@ -4,115 +4,188 @@ using Prospect.Unreal.Runtime;
 using Prospect.Unreal.Net.Packets.Control;
 using Prospect.Unreal.Net.Packets.Bunch;
 using Serilog;
+using System.Numerics;
+using Prospect.Shared.Protocol;
+using Microsoft.Extensions.Logging;
 
 namespace Prospect.Server.Game;
 
 internal class Client
 {
     private const float TickRate = (1000.0f / 60.0f) / 1000.0f;
+    private const float PositionUpdateRate = 1.0f / 20.0f; // 20 updates per second
     private readonly PeriodicTimer ClientTick = new PeriodicTimer(TimeSpan.FromSeconds(TickRate));
-    UNetConnection UnitConn;
+    private readonly PeriodicTimer PositionUpdateTick = new PeriodicTimer(TimeSpan.FromSeconds(PositionUpdateRate));
+    
+    private UNetConnection? UnitConn = null;
+    private bool IsConnected = false;
+    private bool IsHandshakeComplete = false;
+    private bool IsLoggedIn = false;
+    private bool IsJoined = false;
+    private int PlayerId = -1;
+    private readonly ILogger<Client> _logger;
+
+    // Player state
+    private Vector3 CurrentPosition = Vector3.Zero;
+    private Vector3 TargetPosition = Vector3.Zero;
+    private float CurrentRotation;
+    private readonly Dictionary<int, PlayerState> OtherPlayers = new();
+
+    public Client(ILogger<Client> logger)
+    {
+        _logger = logger;
+    }
+
     public async Task<UIpNetDriver> Connect(string ipAddr, int port, FUrl worldUrl)
     {
-        var connection = new UIpNetDriver(System.Net.IPAddress.Parse(ipAddr), port, false);
-        await using (var world = new ProspectWorld())
-            connection.InitConnect(world, new FUrl { Host = System.Net.IPAddress.Parse(ipAddr), Port = port });
-        UnitConn = connection.ServerConnection;
-        connection.ServerConnection.Handler?.BeginHandshaking(SendInitialJoin);
-
-        while (await ClientTick.WaitForNextTickAsync())
+        try
         {
-            if (connection != null)
+            _logger.LogInformation("Connecting to {IpAddress}:{Port}", ipAddr, port);
+
+            var connection = new UIpNetDriver(System.Net.IPAddress.Parse(ipAddr), port, false);
+            await using (var world = new ProspectWorld())
+                connection.InitConnect(world, new FUrl { Host = System.Net.IPAddress.Parse(ipAddr), Port = port });
+            UnitConn = connection.ServerConnection;
+            connection.ServerConnection.Handler?.BeginHandshaking(SendInitialJoin);
+
+            // Start update loops
+            _ = StartPositionUpdateLoop();
+
+            while (await ClientTick.WaitForNextTickAsync())
             {
-                connection.TickDispatch(TickRate);
-                connection.PostTickDispatch();
+                if (UnitConn != null && connection != null)
+                {
+                    connection.TickDispatch(TickRate);
+                    connection.PostTickDispatch();
 
-                connection.TickFlush(TickRate);
-                connection.PostTickFlush();
+                    connection.TickFlush(TickRate);
+                    connection.PostTickFlush();
+                }
             }
-        }
 
-        return connection;
+            return connection;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error connecting to server");
+            throw;
+        }
     }
-    public void SendInitialJoin()
-    //public static void SendInitialJoin(UNetConnection UnitConn)
+
+    private async Task StartPositionUpdateLoop()
     {
-        var channel = UnitConn.CreateChannelByName(new Unreal.Core.Names.FName(Unreal.Core.Names.EName.Control), Unreal.Net.Channels.EChannelCreateFlags.None, 0);
-        var BunchSequence = ++UnitConn.OutReliable[0];
-        FOutBunch ControlChanBunch = new FOutBunch(channel, false);
-        ControlChanBunch.Time = 0.0;
-        ControlChanBunch.ReceivedAck = false;
-        ControlChanBunch.PacketId = 0;
-        //ControlChanBunch.Channel = nullptr;
-        ControlChanBunch.ChIndex = 0;
-        ControlChanBunch.ChName = new Unreal.Core.Names.FName(Unreal.Core.Names.EName.Control);
-        ControlChanBunch.bReliable = true;
-        ControlChanBunch.ChSequence = BunchSequence;
-        ControlChanBunch.bOpen = true;
-        // NOTE: Might not cover all bOpen or 'channel already open' cases
-        if (UnitConn.Channels[0] != null && UnitConn.Channels[0].OpenPacketId.First == 0)
+        while (await PositionUpdateTick.WaitForNextTickAsync())
         {
-            UnitConn.Channels[0].OpenPacketId = new FPacketIdRange(BunchSequence, BunchSequence);
-        }
-
-        // Need to send 'NMT_Hello' to start off the connection (the challenge is not replied to)
-        byte IsLittleEndian = 0;
-
-        // We need to construct the NMT_Hello packet manually, for the initial connection
-        byte MessageType = (byte)NMT.Hello;
-
-        // Allow the bunch to resize, and be split into partial bunches in SendRawBunch - for Fortnite
-        ControlChanBunch.SetAllowResize(true);
-        ControlChanBunch.WriteByte(MessageType);
-        ControlChanBunch.WriteByte(IsLittleEndian);
-        ControlChanBunch.WriteInt32(0); //FNetworkVersion::GetLocalNetworkVersion();
-        // TODO hello encryption token
-
-        /*bool bSkipControlJoin = !!(MinClientFlags & EMinClientFlags::SkipControlJoin);
-        bool bBeaconConnect = !!(MinClientFlags & EMinClientFlags::BeaconConnect);
-
-        if (bBeaconConnect)
-        {
-            if (!bSkipControlJoin)
+            if (IsConnected && IsHandshakeComplete && IsLoggedIn && IsJoined && UnitConn != null)
             {
-                MessageType = NMT_BeaconJoin;
-                *ControlChanBunch << MessageType;
-                *ControlChanBunch << BeaconType;
-
-                uint8 EncType = 0;
-
-                *ControlChanBunch << EncType;
-                *ControlChanBunch << JoinUID;
-
-                // Also immediately ack the beacon GUID setup; we're just going to let the server setup the client beacon,
-                // through the actor channel
-                MessageType = NMT_BeaconNetGUIDAck;
-                *ControlChanBunch << MessageType;
-                *ControlChanBunch << BeaconType;
+                SendPositionUpdate();
             }
+        }
+    }
+
+    private void SendPositionUpdate()
+    {
+        try
+        {
+            if (UnitConn == null) return;
+            var channel = UnitConn.CreateChannelByName(new Unreal.Core.Names.FName(Unreal.Core.Names.EName.Control), Unreal.Net.Channels.EChannelCreateFlags.None, 0);
+            var bunch = new FOutBunch(channel, false);
+            
+            // Write message type
+            bunch.WriteByte((byte)NetworkMessageType.Movement);
+            
+            // Write movement data
+            bunch.WriteInt32(PlayerId);
+            bunch.WriteFloat(CurrentPosition.X);
+            bunch.WriteFloat(CurrentPosition.Y);
+            bunch.WriteFloat(CurrentPosition.Z);
+            bunch.WriteFloat(CurrentRotation);
+
+            UnitConn.SendRawBunch(bunch, false);
+            UnitConn.FlushNet();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending position update");
+        }
+    }
+
+    public void UpdateMovement(Vector3 newPosition, float newRotation)
+    {
+        TargetPosition = newPosition;
+        CurrentRotation = newRotation;
+    }
+
+    public void SendInitialJoin()
+    {
+        try
+        {
+            if (UnitConn == null) return;
+            var channel = UnitConn.CreateChannelByName(new Unreal.Core.Names.FName(Unreal.Core.Names.EName.Control), Unreal.Net.Channels.EChannelCreateFlags.None, 0);
+            var BunchSequence = ++UnitConn.OutReliable[0];
+            var ControlChanBunch = new FOutBunch(channel, false);
+            
+            // Set up basic bunch properties
+            ControlChanBunch.Time = 0.0;
+            ControlChanBunch.ReceivedAck = false;
+            ControlChanBunch.PacketId = 0;
+            ControlChanBunch.ChIndex = 0;
+            ControlChanBunch.ChName = new Unreal.Core.Names.FName(Unreal.Core.Names.EName.Control);
+            ControlChanBunch.bReliable = true;
+            ControlChanBunch.ChSequence = BunchSequence;
+            ControlChanBunch.bOpen = true;
+
+            if (UnitConn.Channels[0] != null && UnitConn.Channels[0].OpenPacketId.First == 0)
+            {
+                UnitConn.Channels[0].OpenPacketId = new FPacketIdRange(BunchSequence, BunchSequence);
+            }
+
+            // Send NMT_Hello
+            ControlChanBunch.SetAllowResize(true);
+            ControlChanBunch.WriteByte((byte)NetworkMessageType.Hello);
+            ControlChanBunch.WriteByte(0); // IsLittleEndian
+            ControlChanBunch.WriteInt32(0); // NetworkVersion
+
+            UnitConn.SendRawBunch(ControlChanBunch, false);
+            UnitConn.FlushNet();
+
+            IsConnected = true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending initial join");
+        }
+    }
+
+    public void HandleJoinResponse(NMT_JoinResponse response)
+    {
+        if (response.Success)
+        {
+            PlayerId = response.PlayerId;
+            IsJoined = true;
+            _logger.LogInformation("Successfully joined game with PlayerId {PlayerId}", PlayerId);
         }
         else
         {
-            // Then send NMT_Login
-            WriteControlLogin(ControlChanBunch);
+            _logger.LogError("Failed to join game: {Message}", response.Message);
+        }
+    }
 
-            // Now send NMT_Join, which will spawn the PlayerController, which should then trigger replication of basic actor channels
-            if (!bSkipControlJoin)
+    public void HandleMovementUpdate(NMT_Movement update)
+    {
+        if (OtherPlayers.TryGetValue(update.PlayerId, out var player))
+        {
+            player.Position = update.Position;
+            player.Rotation = update.Rotation;
+                }
+                else
+                {
+            OtherPlayers[update.PlayerId] = new PlayerState
             {
-                MessageType = NMT_Join;
-                *ControlChanBunch << MessageType;
-            }
-        }*/
-
-
-        UnitConn.SendRawBunch(ControlChanBunch, false);
-        // Immediately flush, so that Fortnite doesn't trigger an overflow
-        UnitConn.FlushNet();
-
-
-        // At this point, fire of notification that we are connected
-        //bConnected = true;
-
-        //ConnectedDel.ExecuteIfBound();
+                PlayerId = update.PlayerId,
+                Position = update.Position,
+                Rotation = update.Rotation
+            };
+        }
     }
 }

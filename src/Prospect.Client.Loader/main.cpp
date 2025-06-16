@@ -418,6 +418,33 @@ bool Inject(HANDLE hProcess, const wchar_t* dllPath) {
     return true;
 }
 
+bool WaitForDLLToLoad(DWORD processID, const wchar_t* dllName, int maxAttempts = 10) {
+    for (int i = 0; i < maxAttempts; i++) {
+        HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, processID);
+        if (snapshot == INVALID_HANDLE_VALUE) {
+            printf("Failed to create snapshot. Error: %lu\n", GetLastError());
+            return false;
+        }
+
+        MODULEENTRY32W moduleEntry;
+        moduleEntry.dwSize = sizeof(moduleEntry);
+
+        if (Module32FirstW(snapshot, &moduleEntry)) {
+            do {
+                if (_wcsicmp(moduleEntry.szModule, dllName) == 0) {
+                    CloseHandle(snapshot);
+                    return true;
+                }
+            } while (Module32NextW(snapshot, &moduleEntry));
+        }
+
+        CloseHandle(snapshot);
+        printf("Waiting for %ls to load...\n", dllName);
+        Sleep(1000);
+    }
+    return false;
+}
+
 bool Patch(const wchar_t* processName) {
     DWORD processID;
 
@@ -425,10 +452,26 @@ bool Patch(const wchar_t* processName) {
     if (hProcess == NULL) {
         return false;
     }
+
+    // Inject UE4SS first
+    if (!Inject(hProcess, L"UE4SS.dll")) {
+        return false;
+    }
+
+    // Wait for UE4SS to load
+    if (!WaitForDLLToLoad(processID, L"UE4SS.dll")) {
+        printf("Failed to wait for UE4SS.dll to load!\n");
+        return false;
+    }
+
+    // Then inject our agent
     if (!Inject(hProcess, L"Prospect.Agent.dll")) {
         return false;
     }
-    if (!Inject(hProcess, L"UE4SS.dll")) {
+
+    // Wait for our agent to load
+    if (!WaitForDLLToLoad(processID, L"Prospect.Agent.dll")) {
+        printf("Failed to wait for Prospect.Agent.dll to load!\n");
         return false;
     }
 

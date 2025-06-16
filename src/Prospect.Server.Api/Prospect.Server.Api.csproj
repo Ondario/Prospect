@@ -5,6 +5,8 @@
         <ImplicitUsings>true</ImplicitUsings>
         <Nullable>enable</Nullable>
         <Configurations>Debug;Release;Season 3 Release;Season 2 Release;Season 2 Debug;Season 3 Debug</Configurations>
+        <ErrorOnDuplicatePublishOutputFiles>false</ErrorOnDuplicatePublishOutputFiles>
+        <SatelliteResourceLanguages>en-US</SatelliteResourceLanguages>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Season 3 Debug|AnyCPU'">
@@ -21,6 +23,14 @@
 
     <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
       <Optimize>True</Optimize>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+      <DefineConstants>$(DefineConstants);SEASON_3_DEBUG</DefineConstants>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+      <DefineConstants>$(DefineConstants)</DefineConstants>
     </PropertyGroup>
 
     <ItemGroup>

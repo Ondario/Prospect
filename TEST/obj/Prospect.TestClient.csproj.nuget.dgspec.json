@@ -1,0 +1,301 @@
+{
+  "format": 1,
+  "restore": {
+    "C:\\Projects\\Prospect\\TEST\\Prospect.TestClient.csproj": {}
+  },
+  "projects": {
+    "C:\\Projects\\Prospect\\src\\Prospect.Server.Game\\Prospect.Server.Game.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\Projects\\Prospect\\src\\Prospect.Server.Game\\Prospect.Server.Game.csproj",
+        "projectName": "Prospect.Server.Game",
+        "projectPath": "C:\\Projects\\Prospect\\src\\Prospect.Server.Game\\Prospect.Server.Game.csproj",
+        "packagesPath": "C:\\Users\\Jeffr\\.nuget\\packages\\",
+        "outputPath": "C:\\Projects\\Prospect\\src\\Prospect.Server.Game\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\Jeffr\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "C:\\Projects\\Prospect\\src\\Prospect.Shared\\Prospect.Shared.csproj": {
+                "projectPath": "C:\\Projects\\Prospect\\src\\Prospect.Shared\\Prospect.Shared.csproj"
+              },
+              "C:\\Projects\\Prospect\\src\\Prospect.Unreal\\Prospect.Unreal.csproj": {
+                "projectPath": "C:\\Projects\\Prospect\\src\\Prospect.Unreal\\Prospect.Unreal.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "9.0.300"
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "Microsoft.Extensions.Hosting": {
+              "target": "Package",
+              "version": "[9.0.6, )"
+            },
+            "Microsoft.Extensions.Logging.Abstractions": {
+              "target": "Package",
+              "version": "[9.0.6, )"
+            },
+            "Serilog": {
+              "target": "Package",
+              "version": "[4.2.0, )"
+            },
+            "Serilog.Extensions.Hosting": {
+              "target": "Package",
+              "version": "[9.0.0, )"
+            },
+            "Serilog.Sinks.Console": {
+              "target": "Package",
+              "version": "[6.0.0, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.301/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "C:\\Projects\\Prospect\\src\\Prospect.Shared\\Prospect.Shared.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\Projects\\Prospect\\src\\Prospect.Shared\\Prospect.Shared.csproj",
+        "projectName": "Prospect.Shared",
+        "projectPath": "C:\\Projects\\Prospect\\src\\Prospect.Shared\\Prospect.Shared.csproj",
+        "packagesPath": "C:\\Users\\Jeffr\\.nuget\\packages\\",
+        "outputPath": "C:\\Projects\\Prospect\\src\\Prospect.Shared\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\Jeffr\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "C:\\Projects\\Prospect\\src\\Prospect.Unreal\\Prospect.Unreal.csproj": {
+                "projectPath": "C:\\Projects\\Prospect\\src\\Prospect.Unreal\\Prospect.Unreal.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "9.0.300"
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.301/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "C:\\Projects\\Prospect\\src\\Prospect.Unreal\\Prospect.Unreal.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\Projects\\Prospect\\src\\Prospect.Unreal\\Prospect.Unreal.csproj",
+        "projectName": "Prospect.Unreal",
+        "projectPath": "C:\\Projects\\Prospect\\src\\Prospect.Unreal\\Prospect.Unreal.csproj",
+        "packagesPath": "C:\\Users\\Jeffr\\.nuget\\packages\\",
+        "outputPath": "C:\\Projects\\Prospect\\src\\Prospect.Unreal\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\Jeffr\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "9.0.300"
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "Serilog": {
+              "target": "Package",
+              "version": "[4.0.0, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.301/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "C:\\Projects\\Prospect\\TEST\\Prospect.TestClient.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\Projects\\Prospect\\TEST\\Prospect.TestClient.csproj",
+        "projectName": "Prospect.TestClient",
+        "projectPath": "C:\\Projects\\Prospect\\TEST\\Prospect.TestClient.csproj",
+        "packagesPath": "C:\\Users\\Jeffr\\.nuget\\packages\\",
+        "outputPath": "C:\\Projects\\Prospect\\TEST\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\Jeffr\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "C:\\Projects\\Prospect\\src\\Prospect.Server.Game\\Prospect.Server.Game.csproj": {
+                "projectPath": "C:\\Projects\\Prospect\\src\\Prospect.Server.Game\\Prospect.Server.Game.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "9.0.300"
+      },
+      "frameworks": {
+        "net8.0": {
+          "targetAlias": "net8.0",
+          "dependencies": {
+            "Microsoft.Extensions.Hosting": {
+              "target": "Package",
+              "version": "[9.0.6, )"
+            },
+            "Serilog.Extensions.Hosting": {
+              "target": "Package",
+              "version": "[9.0.0, )"
+            },
+            "Serilog.Sinks.Console": {
+              "target": "Package",
+              "version": "[6.0.0, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.301/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}

@@ -1,50 +1,139 @@
-# TODO: Full Local Multiplayer Implementation Roadmap
+# Prospect Server Implementation Plan
 
-## 1. Game Server Orchestration & Session Management
-- [ ] Implement API logic to launch a new Prospect.Server.Game process per multiplayer session
-    - [ ] Pass session ID, map, and port to the game server
-    - [ ] Track running sessions and their addresses/ports
-    - [ ] Clean up/shutdown game servers when sessions end
-- [ ] Ensure API provides correct session info (address/port) to all clients in a squad
-- [ ] Add robust error handling for session creation, server launch failures, and client assignment
+## Multiplayer Implementation
 
-## 2. Matchmaking & Squad Flow
-- [ ] Complete squad matchmaking logic (ready-up, map selection, trigger session creation)
-- [ ] Notify all squad members of session info via SignalR or API response
-- [ ] Ensure clients can only join their assigned session
+### 1. Server.Game Setup
+- [ ] Basic server structure
+  - [ ] Network listener setup
+  - [ ] Server tick implementation
+  - [ ] Client connection handling
+  - [ ] Basic error handling and logging
 
-## 3. Networking & Actor Replication
-- [ ] Implement full actor replication in NetDriver, NetConnection, UChannel, and AActor
-    - [ ] Server-to-client actor state sync (spawn, update, destroy)
-    - [ ] Actor channel management for multiple clients
-    - [ ] Reliable/ordered packet flow for actor data
-    - [ ] Support for reconnections and late joins
-- [ ] Finish channel management for all channel types (control, actor, voice)
-    - [ ] Channel open/close, state sync, error handling
+### 2. Match Session Management
+- [ ] Match session structure
+  - [ ] Session ID generation
+  - [ ] Player tracking
+  - [ ] Match state management
+  - [ ] Map name handling
+- [ ] Match lifecycle
+  - [ ] Match creation
+  - [ ] Player joining
+  - [ ] Match start
+  - [ ] Match end
+  - [ ] Cleanup
 
-## 4. Client-Server Handshake & Authentication
-- [ ] Implement robust handshake: login, join, session validation
-- [ ] Integrate authentication/session join with API and game server
-- [ ] Handle edge cases: duplicate logins, invalid sessions, disconnects
+### 3. Player Management
+- [ ] Player state tracking
+  - [ ] Connection handling
+  - [ ] Position updates
+  - [ ] Player status
+  - [ ] Disconnection handling
+- [ ] Spawn system
+  - [ ] Spawn point management
+  - [ ] Player spawning
+  - [ ] Respawn handling
 
-## 5. Voice & Additional Multiplayer Features
-- [ ] Implement voice channel logic (if required)
-- [ ] Add support for squad deployment, world events, and other multiplayer features
+### 4. Network Protocol
+- [ ] Message types
+  - [ ] JoinMatch
+  - [ ] LeaveMatch
+  - [ ] MatchState
+  - [ ] PlayerUpdate
+  - [ ] PlayerSpawn
+  - [ ] PlayerDisconnect
+- [ ] Message handling
+  - [ ] Message serialization
+  - [ ] Message broadcasting
+  - [ ] Error handling
 
-## 6. Test Coverage & Documentation
-- [ ] Expand test coverage for all multiplayer flows (session creation, join, actor replication)
-- [ ] Add integration tests for multi-client scenarios
-- [ ] Document end-to-end multiplayer flow and C++/C# integration (Loader/Agent)
-- [ ] Update ProjectOverview.md and TODO.md after every major change
+### 5. Client Integration
+- [ ] Client-side changes
+  - [ ] Server connection handling
+  - [ ] Map loading integration
+  - [ ] Player state synchronization
+- [ ] Matchmaking flow
+  - [ ] Match creation
+  - [ ] Player joining
+  - [ ] State updates
 
----
+### 6. Testing Plan
+- [ ] Server testing
+  - [ ] Server startup
+  - [ ] Connection handling
+  - [ ] Match creation
+- [ ] Client testing
+  - [ ] Connection to server
+  - [ ] Match joining
+  - [ ] State synchronization
+- [ ] Integration testing
+  - [ ] Full match flow
+  - [ ] Multiple players
+  - [ ] Error scenarios
 
-**Execution Priorities:**
-1. Game server orchestration and session management
-2. Matchmaking and squad flow
-3. Networking and actor replication
-4. Handshake/authentication
-5. Voice/extra features
-6. Tests and documentation
+## Implementation Notes
 
-**All changes must be explicit, measurable, and documented. No undocumented hacks or shortcuts.**
+### Server.Game Structure
+```csharp
+public class GameServer
+{
+    private readonly Dictionary<string, MatchSession> _activeMatches = new();
+    private readonly Dictionary<string, PlayerState> _players = new();
+    private readonly UIpNetDriver _netDriver;
+    private readonly PeriodicTimer _serverTick = new(TimeSpan.FromSeconds(1.0f / 60.0f));
+}
+```
+
+### Match Session Structure
+```csharp
+public class MatchSession
+{
+    public string SessionId { get; set; }
+    public string MapName { get; set; }
+    public Dictionary<string, PlayerState> Players { get; set; }
+    public MatchState State { get; set; }
+    public DateTime StartTime { get; set; }
+}
+```
+
+### Player State Structure
+```csharp
+public class PlayerState
+{
+    public string PlayerId { get; set; }
+    public string SessionId { get; set; }
+    public Vector3 Position { get; set; }
+    public float Rotation { get; set; }
+    public PlayerStatus Status { get; set; }
+}
+```
+
+### Network Message Types
+```csharp
+public enum NetworkMessageType
+{
+    // Match management
+    JoinMatch,
+    LeaveMatch,
+    MatchState,
+    
+    // Player updates
+    PlayerUpdate,
+    PlayerSpawn,
+    PlayerDisconnect
+}
+```
+
+## Current Status
+- Basic server structure is in place
+- Need to implement match session management
+- Need to implement player state tracking
+- Need to implement network protocol
+- Need to integrate with client
+
+## Next Steps
+1. Implement basic server structure
+2. Add match session management
+3. Implement player state tracking
+4. Set up network protocol
+5. Integrate with client
+6. Begin testing

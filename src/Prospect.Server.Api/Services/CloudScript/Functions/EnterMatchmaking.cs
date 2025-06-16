@@ -1,5 +1,7 @@
 ﻿using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Options;
+using Prospect.Server.Api.Config;
 using Prospect.Server.Api.Hubs;
 using Prospect.Server.Api.Services.Auth.Extensions;
 using Prospect.Server.Api.Services.CloudScript.Models;
@@ -14,17 +16,20 @@ public class EnterMatchmakingFunction : ICloudScriptFunction<FYEnterMatchAzureFu
     private readonly IHubContext<CycleHub> _hubContext;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly SquadService _squadService;
+    private readonly MatchServerSettings _matchSettings;
 
     public EnterMatchmakingFunction(
         ILogger<EnterMatchmakingFunction> logger,
         IHubContext<CycleHub> hubContext, 
-        IHttpContextAccessor httpContextAccessor, 
+        IHttpContextAccessor httpContextAccessor,
+        IOptions<MatchServerSettings> matchSettings,
         SquadService squadService = null)
     {
         _logger = logger;
         _hubContext = hubContext;
         _httpContextAccessor = httpContextAccessor;
         _squadService = squadService;
+        _matchSettings = matchSettings.Value;
     }
 
     public async Task<FYEnterMatchAzureFunctionResult> ExecuteAsync(FYEnterMatchAzureFunction request)
@@ -53,16 +58,21 @@ public class EnterMatchmakingFunction : ICloudScriptFunction<FYEnterMatchAzureFu
         // Check if this is a squad matchmaking request
         bool isSquad = !string.IsNullOrEmpty(request.SquadId) && request.SquadId != "_";
         _logger.LogInformation("[MATCH] Is Squad Request: {IsSquad}", isSquad);
+
+        // Generate a unique session ID for this match
+        string sessionId = Guid.NewGuid().ToString();
         
-        // Set SingleplayerStation to false to route directly to a match
+        // Return match connection details
         return new FYEnterMatchAzureFunctionResult
         {
             Success = true,
             ErrorMessage = "",
             SingleplayerStation = false,
-            Address = "127.0.0.1",
-            Port = 7777,
+            Address = _matchSettings.Host,
+            Port = _matchSettings.Port,
             MaintenanceMode = false,
+            SessionId = sessionId,
+            ShardIndex = 0
         };
     }
 }

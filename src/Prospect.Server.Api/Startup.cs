@@ -27,6 +27,7 @@ public class Startup
         services.Configure<PlayFabSettings>(Configuration.GetSection(nameof(PlayFabSettings)));
         services.Configure<VivoxConfig>(Configuration.GetSection(nameof(VivoxConfig)));
         services.Configure<SignalRSettings>(Configuration.GetSection(nameof(SignalRSettings)));
+        services.Configure<MatchServerSettings>(Configuration.GetSection(nameof(MatchServerSettings)));
 
         services.AddSingleton<AuthTokenService>();
         services.AddSingleton<UserDataService>();

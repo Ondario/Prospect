@@ -33,9 +33,17 @@ function copyActiveContractsProgress(activeContractsProgressClamp)
     return data
 end
 
+-- Add at the top of the file, after the requires
+local function debugLog(message)
+    print("[Prospect] " .. message)
+end
+
 ExecuteInGameThread(function()
+    debugLog("Mod initialized!")
+    
     ---@class UYBackendControllerLibrary
     local GUBackendController = FindFirstOf('YBackendControllerLibrary')
+    debugLog("Backend Controller found: " .. tostring(GUBackendController ~= nil))
 
     -- TODO: Probably these globals can be replaced
     -- Currently here for improved performance
@@ -45,11 +53,64 @@ ExecuteInGameThread(function()
     local GameInstance = nil
     local CurrentProgressClamp = nil
 
-    --- Always occurs before map is loaded
+    -- Hook into authentication
+    RegisterHook("/Script/Prospect.YGameInstance:OnAuthenticationComplete", function(self, entityToken, userId)
+        debugLog("Authentication Complete:")
+        debugLog("  Entity Token: " .. tostring(entityToken))
+        debugLog("  User ID: " .. tostring(userId))
+    end)
+
+    -- Hook into matchmaking
+    RegisterHook("/Script/Prospect.YMatchmakingManager:SetReadyForMatch", function(self, isReady, selectedMapName)
+        debugLog("Matchmaking Ready:")
+        debugLog("  Ready: " .. tostring(isReady))
+        debugLog("  Map: " .. tostring(selectedMapName))
+        debugLog("  User ID: " .. tostring(self:GetUserId()))
+    end)
+
+    -- Hook into travel request creation
+    RegisterHook("/Script/Prospect.YControllerTravelComponent:CreateTravelRequest", function () end, function(self)
+        debugLog("=== Travel Request ===")
+        local travelData = self:get().m_travelData
+        debugLog("Context: " .. travelData.m_context)
+        debugLog("Map Name: " .. travelData.m_mapName)
+        debugLog("Instance Type: " .. tostring(travelData.m_instanceType))
+        debugLog("Load Map Directly: " .. tostring(travelData.m_loadMapDirectly))
+        debugLog("Generated Request: " .. tostring(travelData.m_generatedRequest))
+        debugLog("Evaluate Session State: " .. tostring(travelData.m_evaluateSessionState))
+        debugLog("Cancel Existing Travel: " .. tostring(travelData.m_cancelExistingTravel))
+        debugLog("Wait For Resources: " .. tostring(travelData.m_waitForResources))
+    end)
+
+    -- Hook into travel
+    RegisterHook("/Script/Prospect.YControllerTravelComponent:TryTravelToSession", function(self, sessionId)
+        debugLog("Travel to Session:")
+        debugLog("  Session ID: " .. tostring(sessionId))
+        debugLog("  User ID: " .. tostring(self:GetUserId()))
+    end)
+
+    -- Hook into session state
+    RegisterHook("/Script/Prospect.YControllerTravelComponent:OnPendingSessionReturn", function(self, result)
+        debugLog("Session State:")
+        debugLog("  Can Go To Session: " .. tostring(result.canGoToSession))
+        debugLog("  Should Cancel: " .. tostring(result.shouldCancel))
+        debugLog("  Connection Data:")
+        debugLog("    Address: " .. tostring(result.connectionData.addr))
+        debugLog("    Session ID: " .. tostring(result.connectionData.sessionId))
+        debugLog("    Server ID: " .. tostring(result.connectionData.serverId))
+        debugLog("    Region: " .. tostring(result.connectionData.region))
+        debugLog("    Is Match: " .. tostring(result.connectionData.m_isMatch))
+    end)
+
+    -- Hook into player spawn
     RegisterHook("/Script/Engine.PlayerController:ServerAcknowledgePossession", function () end, function(self)
-        print("ServerAcknowledgePossession triggered")
+        debugLog("=== Player Spawn ===")
         Player = self:get()
-        print(Player:GetFullName())
+        debugLog("Player Name: " .. Player:GetFullName())
+        debugLog("Player State: " .. Player.PlayerState:GetFullName())
+        debugLog("Player Location: " .. Player:GetActorLocation():ToString())
+        debugLog("Player Rotation: " .. Player:GetActorRotation():ToString())
+        debugLog("Player ID: " .. Player.PlayerState:GetPlayerId():ToString())
 
         ---@class UYPlayerInitializationComponent
         local PlayerInitializationComponent = Player.m_initializationComponent
@@ -57,9 +118,65 @@ ExecuteInGameThread(function()
         PlayerInitializationComponent:NotifyClientAboutServerFinishedInitialization()
     end)
 
-    --- Occurs when active contracts are received from the backend
+    -- Hook into match join
+    RegisterHook("/Script/Prospect.YActivityLocationsManager:OnActivitiesLoaded", function () end, function(self)
+        debugLog("=== Match Join ===")
+        debugLog("Activities loaded")
+        ---@class AAAM_Escape_BP_C
+        local ActivityManagerEscapeActors = FindAllOf('AAM_Escape_BP_C') ---@type AAAM_Escape_BP_C[]
+        for _, e in ipairs(ActivityManagerEscapeActors) do
+            if string.find(e:GetFullName(), "/Game/Maps") then
+                debugLog("Activity Manager: " .. e:GetFullName())
+                debugLog("Player State: " .. Player.PlayerState:GetFullName())
+                --- This sets the evacs for the player on server join
+                e:OnPlayerJoined(Player.PlayerState);
+                break
+            end
+        end
+    end)
+
+    -- Hook into player movement
+    RegisterHook("/Script/Engine.PlayerController:ClientUpdatePosition", function () end, function(self)
+        debugLog("=== Player Movement ===")
+        debugLog("Player Location: " .. Player:GetActorLocation():ToString())
+        debugLog("Player Rotation: " .. Player:GetActorRotation():ToString())
+        debugLog("Player Velocity: " .. Player:GetVelocity():ToString())
+    end)
+
+    -- Hook into player actions
+    RegisterHook("/Script/Engine.PlayerController:ServerStartFire", function () end, function(self)
+        debugLog("=== Player Action ===")
+        debugLog("Player started firing")
+        debugLog("Player Location: " .. Player:GetActorLocation():ToString())
+        debugLog("Player Rotation: " .. Player:GetActorRotation():ToString())
+    end)
+
+    -- Hook into match leave
+    RegisterHook("/Script/Prospect.YControllerContractsActivesDataComponent:OnPlayerFinishedMatch", function(self)
+        debugLog("=== Match Leave ===")
+        debugLog("Player finished match")
+        debugLog("Player State: " .. Player.PlayerState:GetFullName())
+        debugLog("Player Location: " .. Player:GetActorLocation():ToString())
+        debugLog("Player Rotation: " .. Player:GetActorRotation():ToString())
+    end)
+
+    -- Hook into inventory updates
+    RegisterHook("/Script/Prospect.YInventoryManager:SendCompleteInventoryUpdate", function(self, userId, items)
+        debugLog("Inventory Update:")
+        debugLog("  User ID: " .. tostring(userId))
+        for _, item in ipairs(items) do
+            debugLog("  Item:")
+            debugLog("    Custom ID: " .. tostring(item.m_customItemID))
+            debugLog("    Type: " .. tostring(item.itemType))
+            debugLog("    Rarity: " .. tostring(item.rarityType))
+            debugLog("    Amount: " .. tostring(item.amount))
+            debugLog("    Vanity Amount: " .. tostring(item.vanityAmount))
+        end
+    end)
+
+    -- Occurs when active contracts are received from the backend
     RegisterHook("/Script/Prospect.YControllerContractsActivesDataComponent:HandlePlayerActiveContractsReceived", function () end, function(self)
-        print("HandlePlayerActiveContractsReceived triggered")
+        debugLog("HandlePlayerActiveContractsReceived triggered")
         ---@class UYControllerContractsActivesDataComponent
         local contractsActives = self:get()
         CurrentProgressClamp = copyActiveContractsProgress(contractsActives.m_contractsCurrentProgressClamp.activeContractsProgressClamp)
@@ -85,33 +202,11 @@ ExecuteInGameThread(function()
     --     end
     -- end)
 
-    --- Occurs once all activity actors are available
-    RegisterHook("/Script/Prospect.YActivityLocationsManager:OnActivitiesLoaded", function () end, function(self)
-        print("Activities loaded")
-        ---@class AAAM_Escape_BP_C
-        local ActivityManagerEscapeActors = FindAllOf('AAM_Escape_BP_C') ---@type AAAM_Escape_BP_C[]
-        for _, e in ipairs(ActivityManagerEscapeActors) do
-            if string.find(e:GetFullName(), "/Game/Maps") then
-                --- This sets the evacs for the player on server join
-                e:OnPlayerJoined(Player.PlayerState);
-                --- Enables all evacs
-                --- e:DEBUG_EnableAllEvacLocations()
-                break
-            end
-        end
-    end)
-
-    --- Occurs once after authorization is complete on login screen
-    RegisterHook("/Script/Prospect.YGameInstance:OnAuthorizationComplete", function () end, function(self)
-        GameInstance = self:get()
-        print(GameInstance:GetFullName())
-    end)
-
-    -- Fires when an objective is being updated (either on contracts init or on objective progress update).
+    --- Fires when an objective is being updated (either on contracts init or on objective progress update).
     -- NOTE: For some reason, does not fire on OnCharacterVisitedArea and TryConsumeDeadDropItems, but has the progress set.
     -- Store the current progress before execution.
     RegisterHook("/Script/Prospect.YControllerContractsActivesDataComponent:TrackerProgressUpdate", function(self, newData)
-        print("TrackerProgressUpdate")
+        debugLog("TrackerProgressUpdate")
         ---@class FYContractsProgress
         local contractsProgress = newData:get()
         CurrentProgressClamp = copyActiveContractsProgress(contractsProgress.activeContractsProgressClamp)
@@ -120,7 +215,7 @@ ExecuteInGameThread(function()
     -- Fires on client when the client visits areas of interest.
     -- The tracker is updated post-execution.
     RegisterHook("/Script/Prospect.YControllerContractsActivesDataComponent:OnCharacterVisitedArea", function () end, function(self)
-        print("Visited area")
+        debugLog("Visited area")
         ---@class UYControllerContractsActivesDataComponent
         local contractsActives = self:get()
         local data = copyActiveContractsProgress(contractsActives.m_contractsCurrentProgressClamp.activeContractsProgressClamp)
@@ -134,7 +229,7 @@ ExecuteInGameThread(function()
     -- Fires on client when attempting to store dead drop items.
     -- The tracker is updated post-execution.
     RegisterHook("/Script/Prospect.YControllerContractsActivesDataComponent:TryConsumeDeadDropItems", function () end, function(self)
-        print("Consuming dead drop items")
+        debugLog("Consuming dead drop items")
         ---@class UYControllerContractsActivesDataComponent
         local contractsActives = self:get()
         local data = copyActiveContractsProgress(contractsActives.m_contractsCurrentProgressClamp.activeContractsProgressClamp)
@@ -145,57 +240,54 @@ ExecuteInGameThread(function()
         contractsActives:TrackerProgressUpdate({ activeContractsProgressClamp = data })
     end)
 
-    -- Occurs on end of match screen (on evac, death, or voluntary leave).
-    -- Hook order does not matter since OnPlayerFinishedMatch won't do anything on the client side.
-    RegisterHook("/Script/Prospect.YControllerContractsActivesDataComponent:OnPlayerFinishedMatch", function(self)
-        print("Sending contracts data...")
-        ---@class UYControllerContractsActivesDataComponent
-        local contractsActives = self:get()
-        local data = {
-            userId = GUBackendController:FindUniqueId(Player, 0):ToString(),
-            contracts = {}
-        }
-        contractsActives.m_contractsCurrentProgressClamp.activeContractsProgressClamp:ForEach(function (idx, elem)
-            local contractData = elem:get()
-            local contract = {
-                contractId = contractData.contractId:ToString(),
-                progress = {}
-            }
-            contractData.objectivesProgress:ForEach(function (i, e)
-                table.insert(contract.progress, e:get())
-            end)
-            table.insert(data.contracts, contract)
-        end)
-        local json_data = json.encode(data)
-        local playfabRequest = {
-            FunctionName = "UpdatePlayerActiveContracts",
-            FunctionParameter = json_data,
-            GeneratePlayStreamEvent = false
-        }
-        local out = json.encode(playfabRequest)
-        print(out)
-
-        local response = {}
-
-        -- Send the request
-        -- TODO: Not using UPlayFabCloudScriptAPI interface because UE4SS
-        -- fails to construct FCloudScriptExecuteFunctionRequest (or I haven't figured out how to do that properly)
-        -- TODO: Use LuaSec with HTTPS or figure out how to use UPlayFabCloudScriptAPI
-        local _, status = http.request{
-            url = "http://127.0.0.1:8000/CloudScript/ExecuteFunction",
-            method = "POST",
-            headers = {
-                ["Host"] = "127.0.0.1:8000",
-                ["Content-Type"] = "application/json",
-                ["Content-Length"] = tostring(#out),
-                ["X-EntityToken"] = GameInstance.m_authorizationManager.m_playfabInstance.m_authContext.m_entityToken:ToString(),
-                ["Connection"] = "close"
-            },
-            source = ltn12.source.string(out),
-            sink = ltn12.sink.table(response)
-        }
-        print("Status:", status)
-        print("Response:")
-        print(table.concat(response))
+    -- Hook into squad matchmaking
+    RegisterHook("/Script/Prospect.YMatchmakingManager:OnMatchmakingResultReceived", function(self, result)
+        debugLog("Matchmaking Result:")
+        debugLog("  Success: " .. tostring(result.success))
+        debugLog("  Blocker: " .. tostring(result.blocker))
+        debugLog("  Attempts: " .. tostring(result.numAttempts))
+        debugLog("  Session ID: " .. tostring(result.sessionId))
+        debugLog("  Is Match Travel: " .. tostring(result.isMatchTravel))
     end)
+
+    -- Hook into player replication
+    RegisterHook("/Script/Prospect.YPlayerCharacter:OnRep_PlayerState", function(self)
+        debugLog("Player State Updated:")
+        debugLog("  Player ID: " .. tostring(self:GetPlayerId()))
+        debugLog("  Is Spawned: " .. tostring(self:IsSpawned()))
+    end)
+
+    -- Hook into network connection state
+    RegisterHook("/Script/Prospect.YNetworkConnectionComponent:OnConnectionStateChanged", function () end, function(self)
+        debugLog("=== Network Connection ===")
+        debugLog("Connection state changed")
+        local state = self:get().m_connectionState
+        debugLog("Connection State: " .. tostring(state))
+    end)
+
+    -- Hook into player synchronization
+    RegisterHook("/Script/Prospect.YPlayerSynchronizationComponent:OnPlayerSynchronized", function () end, function(self)
+        debugLog("=== Player Synchronization ===")
+        debugLog("Player synchronized")
+        local playerId = self:get().m_playerId
+        debugLog("Player ID: " .. playerId)
+    end)
+
+    -- Hook into match state changes
+    RegisterHook("/Script/Prospect.YGameModeBase:OnMatchStateChanged", function () end, function(self)
+        debugLog("=== Match State ===")
+        debugLog("Match state changed")
+        local matchState = self:get().m_matchState
+        debugLog("Match State: " .. tostring(matchState))
+    end)
+
+    -- Hook into world composition
+    RegisterHook("/Script/Prospect.YGameInstance:OnWorldCompositionLoaded", function(self, worldComposition)
+        debugLog("World Composition Loaded:")
+        for _, level in ipairs(worldComposition.levels) do
+            debugLog("  Level: " .. tostring(level.name))
+        end
+    end)
+
+    debugLog("Prospect mod loaded successfully!")
 end)
