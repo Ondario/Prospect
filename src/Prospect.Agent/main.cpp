@@ -58,6 +58,31 @@ SDK::FString __fastcall PlayFabApiGetUrlProxy(SDK::UPlayFabAPISettings* thiz, co
     return std::wstring(L"https://127.0.0.1:8443") + std::wstring(callPath.c_str());
 }
 
+constexpr uintptr_t OffsetSetReadyForMatch = 0x19675D0;
+
+typedef void(__fastcall* tSetReadyForMatch)(void* pThis /*, add params if you know them */);
+tSetReadyForMatch OldSetReadyForMatch = nullptr;
+
+void __fastcall SetReadyForMatch_Hook(void* pThis /*, add params if needed */) {
+    logger::Print("[Agent] Blocked SetReadyForMatch!\n");
+    // Do NOT call the original to block matchmaking
+    // OldSetReadyForMatch(pThis, ...);
+}
+
+bool ShouldBlockSetReadyForMatch() {
+    std::ifstream config("Server.config");
+    if (!config.is_open()) return true; // Default to blocking if file missing
+
+    std::string line;
+    while (std::getline(config, line)) {
+        if (line.find("block_set_ready_for_match=") == 0) {
+            char value = line.back();
+            return value == '1';
+        }
+    }
+    return true; // Default to blocking if not found
+}
+
 DWORD WINAPI OnDllAttach(LPVOID base) {
 	logger::Print("[Agent] DLL Attached\n");
 
@@ -86,6 +111,26 @@ DWORD WINAPI OnDllAttach(LPVOID base) {
 	if (MH_EnableHook(pTarget) != MH_OK) {
 		logger::Print("[Agent] Failed to enable PlayFabAPIGetUrl hook\n");
 		FreeLibraryAndExitThread(hModule, 1);
+	}
+
+	if (ShouldBlockSetReadyForMatch()) {
+		// Hook UYMatchmakingManager::SetReadyForMatch
+		const auto pTargetSetReadyForMatch = reinterpret_cast<LPVOID>(hModulePtr + OffsetSetReadyForMatch);
+		const auto ppOriginalSetReadyForMatch = reinterpret_cast<LPVOID*>(&OldSetReadyForMatch);
+		const auto mhStatusSetReadyForMatch = MH_CreateHook(pTargetSetReadyForMatch, &SetReadyForMatch_Hook, ppOriginalSetReadyForMatch);
+
+		if (mhStatusSetReadyForMatch != MH_OK) {
+			logger::Print("[Agent] Failed to create SetReadyForMatch hook (%d)\n", mhStatusSetReadyForMatch);
+			FreeLibraryAndExitThread(hModule, 1);
+		}
+
+		if (MH_EnableHook(pTargetSetReadyForMatch) != MH_OK) {
+			logger::Print("[Agent] Failed to enable SetReadyForMatch hook\n");
+			FreeLibraryAndExitThread(hModule, 1);
+		}
+		logger::Print("[Agent] SetReadyForMatch hook ENABLED by config.\n");
+	} else {
+		logger::Print("[Agent] SetReadyForMatch hook DISABLED by config.\n");
 	}
 
 	const wchar_t* filePath = L"backend.txt";

@@ -33,7 +33,8 @@ internal static class Program
         
         var worldUrl = new FUrl
         {
-            Map = "/Game/ThirdPersonCPP/Maps/ThirdPersonExampleMap"
+            Map = "/Game/Maps/MP/Station/Station_P",
+            // GameMode = "/Script/Prospect/YGameMode_Station"
         };
         
         await using (var world = new ProspectWorld())

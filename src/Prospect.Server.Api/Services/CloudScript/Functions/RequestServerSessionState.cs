@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Prospect.Server.Api.Services.CloudScript;
+using Microsoft.Extensions.Configuration;
 
 public class FYMatchConnectionData {
     [JsonPropertyName("addr")]
@@ -38,21 +39,50 @@ public class RequestServerSessionStateResponse
 public class RequestServerSessionStateFunction : ICloudScriptFunction<RequestServerSessionStateRequest, RequestServerSessionStateResponse>
 {
     private readonly ILogger<RequestServerSessionStateFunction> _logger;
+    private readonly IConfiguration _configuration;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
-    public RequestServerSessionStateFunction(ILogger<RequestServerSessionStateFunction> logger)
+    public RequestServerSessionStateFunction(
+        ILogger<RequestServerSessionStateFunction> logger,
+        IConfiguration configuration,
+        IHttpContextAccessor httpContextAccessor)
     {
         _logger = logger;
+        _configuration = configuration;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     public async Task<RequestServerSessionStateResponse> ExecuteAsync(RequestServerSessionStateRequest request)
     {
         _logger.LogInformation("Processing server session state");
 
+        // Get client IP address
+        var context = _httpContextAccessor.HttpContext;
+        var clientIp = context?.Connection?.RemoteIpAddress?.ToString() ?? "unknown";
+        
+        // Get Steam host ID from configuration
+        var serverPlayerLanIp = _configuration["ServerPlayerLanIp"] ?? "192.168.86.25";
+        var steamHostId = _configuration["SteamHostId"] ?? "76561198000000000"; // fallback if not set
+
+        // Determine if this is the server player (localhost) or a LAN client
+        bool isServerPlayer = clientIp == "127.0.0.1" || clientIp == "::1" || clientIp == "localhost" || clientIp == serverPlayerLanIp;
+
+        string addr;
+        if (isServerPlayer) {
+            // Server player - return map name to load locally
+            addr = "/Game/Maps/MP/MAP01/MP_Map01_P?listen?blsLanMatch=1"; // You can make this dynamic based on the sessionId if needed
+            _logger.LogInformation("Server player detected (IP: {ClientIp}), returning map name: {MapName}", clientIp, addr);
+        } else {
+            // LAN/Steam client - return Steam host's SteamID
+            addr = $"steam.{steamHostId}";
+            _logger.LogInformation("LAN/Steam client detected (IP: {ClientIp}), returning Steam host ID: {SteamHostId}", clientIp, steamHostId);
+        }
+
         return new RequestServerSessionStateResponse
         {
             CanGoToSession = true,
             ConnectionData = new FYMatchConnectionData {
-                Addr = request.SessionID, // FIXME: This is for offline use case only!,
+                Addr = addr,
                 ConnectSinglePlayer = false,
                 IsMatch = true,
                 ServerID = "testserver",

@@ -82,17 +82,41 @@ public class EnterMatchmakingMatchFunction : ICloudScriptFunction<FYEnterMatchAz
         
         // Send SignalR notification - CRITICAL for matchmaking!
         try {
-            _logger.LogInformation("[MATCH] Broadcasting matchmaking success notification");
+            _logger.LogInformation("[MATCH] Sending matchmaking success notification to the requesting client only");
             
-            // IMPORTANT: We must broadcast to ALL clients
-            await _hubContext.Clients.All.SendAsync("OnSquadMatchmakingSuccess", 
-                new OnSquadMatchmakingSuccessMessage {
-                    Success = true,
-                    SessionID = mapName,
-                    SquadID = request.SquadId ?? "_"
-                });
-                
-            _logger.LogInformation("[MATCH] Successfully broadcast matchmaking notification");
+            // Send only to the requesting client
+            var connectionId = CycleHub.GetConnectionIdForUser(userId);
+            if (!string.IsNullOrEmpty(connectionId))
+            {
+                await _hubContext.Clients.Client(connectionId).SendAsync("OnSquadMatchmakingSuccess", 
+                    new OnSquadMatchmakingSuccessMessage {
+                        Success = true,
+                        SessionID = mapName,
+                        SquadID = request.SquadId ?? "_"
+                    });
+            }
+            // Squad logic for future use:
+            // If you want to notify all squad members, uncomment and use the following:
+            /*
+            var squad = await _squadService.GetPlayerSquadAsync(userId);
+            if (squad != null)
+            {
+                foreach (var member in squad.Members)
+                {
+                    var memberConnectionId = CycleHub.GetConnectionIdForUser(member.UserId);
+                    if (!string.IsNullOrEmpty(memberConnectionId))
+                    {
+                        await _hubContext.Clients.Client(memberConnectionId).SendAsync("OnSquadMatchmakingSuccess", 
+                            new OnSquadMatchmakingSuccessMessage {
+                                Success = true,
+                                SessionID = mapName,
+                                SquadID = squad.SquadId
+                            });
+                    }
+                }
+            }
+            */
+            _logger.LogInformation("[MATCH] Successfully sent matchmaking notification to the client");
         } catch (Exception ex) {
             _logger.LogError("[MATCH] Failed to send matchmaking notification: {Error}", ex.Message);
         }
