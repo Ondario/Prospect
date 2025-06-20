@@ -50,6 +50,13 @@ public class EnterMatchmakingFunction : ICloudScriptFunction<FYEnterMatchAzureFu
             _logger.LogInformation("[MATCH] Corrected map name to: {MapName}", mapName);
         }
         
+        // Append ?listen for listen mode so other players can join
+        if (!mapName.Contains("?listen&blsLanMatch=1"))
+        {
+            mapName += "?listen&blsLanMatch=1";
+            _logger.LogInformation("[MATCH] Added ?listen parameter to map name: {MapName}", mapName);
+        }
+        
         // Check if this is a squad matchmaking request
         bool isSquad = !string.IsNullOrEmpty(request.SquadId) && request.SquadId != "_";
         _logger.LogInformation("[MATCH] Is Squad Request: {IsSquad}", isSquad);

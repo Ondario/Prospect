@@ -435,10 +435,10 @@ public abstract partial class UWorld : FNetworkNotify, IAsyncDisposable
     private void WelcomePlayer(UNetConnection connection)
     {
         // TODO: Properly fetch level name from CurrentLevel
-        var levelName = "/Game/ThirdPersonCPP/Maps/ThirdPersonExampleMap";
+        var levelName = "/Game/Maps/MP/Station/Station_P";
         
         // TODO: Properly fetch from AuthorityGameMode
-        var gameName = "/Script/ThirdPersonMP.ThirdPersonMPGameMode";
+        var gameName = "/Script/Prospect/YGameMode_Station";
         var redirectUrl = string.Empty;
         
         NMT_Welcome.Send(connection, levelName, gameName, redirectUrl);
