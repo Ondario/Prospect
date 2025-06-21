@@ -59,10 +59,12 @@ public class RequestServerSessionStateFunction : ICloudScriptFunction<RequestSer
         // Get client IP address
         var context = _httpContextAccessor.HttpContext;
         var clientIp = context?.Connection?.RemoteIpAddress?.ToString() ?? "unknown";
-        
+
         // Get Steam host ID from configuration
+        //Add a property in your config.json like ("ServerPlayerLanIp": "the ip that the server is on")
         var serverPlayerLanIp = _configuration["ServerPlayerLanIp"] ?? "192.168.86.25";
-        var steamHostId = _configuration["SteamHostId"] ?? "76561198000000000"; // fallback if not set
+            //Add a property in your config.json like ("steamHostId": "your steam id here")
+        var steamHostId = _configuration["SteamHostId"] ?? "76561198288988180"; // fallback if not set
 
         // Determine if this is the server player (localhost) or a LAN client
         bool isServerPlayer = clientIp == "127.0.0.1" || clientIp == "::1" || clientIp == "localhost" || clientIp == serverPlayerLanIp;
@@ -70,7 +72,7 @@ public class RequestServerSessionStateFunction : ICloudScriptFunction<RequestSer
         string addr;
         if (isServerPlayer) {
             // Server player - return map name to load locally
-            addr = "/Game/Maps/MP/MAP01/MP_Map01_P?listen?blsLanMatch=1"; // You can make this dynamic based on the sessionId if needed
+            addr = "/Game/Maps/MP/MAP01/MP_Map01_P?listen?blsLanMatch"; // You can make this dynamic based on the sessionId if needed
             _logger.LogInformation("Server player detected (IP: {ClientIp}), returning map name: {MapName}", clientIp, addr);
         } else {
             // LAN/Steam client - return Steam host's SteamID
