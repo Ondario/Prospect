@@ -32,6 +32,7 @@ public class ClientController : Controller
     private readonly DbEntityService _entityService;
     private readonly UserDataService _userDataService;
     private readonly TitleDataService _titleDataService;
+    private readonly DbFriendService _friendService;
 
     public ClientController(ILogger<ClientController> logger,
         IOptions<PlayFabSettings> settings,
@@ -39,7 +40,8 @@ public class ClientController : Controller
         DbUserService userService,
         DbEntityService entityService,
         UserDataService userDataService,
-        TitleDataService titleDataService)
+        TitleDataService titleDataService,
+        DbFriendService friendService)
     {
         _settings = settings.Value;
         _logger = logger;
@@ -48,6 +50,7 @@ public class ClientController : Controller
         _entityService = entityService;
         _userDataService = userDataService;
         _titleDataService = titleDataService;
+        _friendService = friendService;
     }
 
     [AllowAnonymous]
@@ -317,5 +320,80 @@ public class ClientController : Controller
                 Data = _titleDataService.Find(request.Keys)
             }
         });
+    }
+
+    [HttpPost("GetAccountInfo")]
+    [Produces(MediaTypeNames.Application.Json)]
+    [Authorize(AuthenticationSchemes = UserAuthenticationOptions.DefaultScheme)]
+    public async Task<IActionResult> GetAccountInfo(FGetAccountInfoRequest request)
+    {
+        try
+        {
+            PlayFabUser? user = null;
+
+            // Search by different criteria
+            if (!string.IsNullOrEmpty(request.PlayFabId))
+            {
+                user = await _userService.FindAsync(request.PlayFabId);
+            }
+            else if (!string.IsNullOrEmpty(request.TitleDisplayName))
+            {
+                // Search by display name (case-insensitive)
+                user = await _userService.FindByDisplayNameAsync(request.TitleDisplayName);
+            }
+            else if (!string.IsNullOrEmpty(request.Username))
+            {
+                // Search by username (case-insensitive)
+                user = await _userService.FindByUsernameAsync(request.Username);
+            }
+            else if (!string.IsNullOrEmpty(request.Email))
+            {
+                // Search by email (case-insensitive)
+                user = await _userService.FindByEmailAsync(request.Email);
+            }
+
+            if (user == null)
+            {
+                return Ok(new ClientResponse<FGetAccountInfoResult>
+                {
+                    Code = 200,
+                    Status = "OK",
+                    Data = new FGetAccountInfoResult
+                    {
+                        AccountInfo = null
+                    }
+                });
+            }
+
+            return Ok(new ClientResponse<FGetAccountInfoResult>
+            {
+                Code = 200,
+                Status = "OK",
+                Data = new FGetAccountInfoResult
+                {
+                    AccountInfo = new FUserAccountInfo
+                    {
+                        PlayFabId = user.Id,
+                        TitleDisplayName = user.DisplayName,
+                        Username = user.DisplayName, // Using display name as username for now
+                        Email = null, // Email not stored in current user model
+                        Created = user.CreatedAt,
+                        LastLogin = user.LastLoginAt
+                    }
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in GetAccountInfo");
+            return StatusCode(500, new ClientResponse
+            {
+                Code = 500,
+                Status = "InternalServerError",
+                Error = "InternalServerError",
+                ErrorCode = 1000,
+                ErrorMessage = "An error occurred while retrieving account information"
+            });
+        }
     }
 }

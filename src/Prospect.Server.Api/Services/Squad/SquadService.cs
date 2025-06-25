@@ -23,6 +23,8 @@ namespace Prospect.Server.Api.Services.Squad
             _logger = logger;
             _hubContext = hubContext;
             _userDataService = userDataService;
+            // Start periodic orphaned squad cleanup
+            StartOrphanedSquadCleanup();
         }
 
         public async Task<SquadData> CreateSquadAsync(string leaderId, string leaderDisplayName)
@@ -53,7 +55,7 @@ namespace Prospect.Server.Api.Services.Squad
                 }
             };
             
-            // Store the squad
+            // Store the squad in memory only
             _squads[squad.SquadId] = squad;
             
             // Update player's squad state
@@ -75,7 +77,7 @@ namespace Prospect.Server.Api.Services.Squad
                 return null;
             }
 
-            // Try to get the squad
+            // Try to get the squad from memory only
             _squads.TryGetValue(squadId, out var squad);
             return squad;
         }
@@ -164,6 +166,7 @@ namespace Prospect.Server.Api.Services.Squad
                 
                 if (string.IsNullOrEmpty(squadId))
                 {
+                    _logger.LogWarning("RemovePlayerFromSquadAsync: No squadId for user {UserId}", userId);
                     return false;
                 }
             }
@@ -176,6 +179,10 @@ namespace Prospect.Server.Api.Services.Squad
             var squad = GetSquad(squadId);
             if (squad == null)
             {
+                _logger.LogWarning("RemovePlayerFromSquadAsync: Squad {SquadId} not found for user {UserId}", squadId, userId);
+                // Defensive: clear player state anyway
+                userState.SquadId = "";
+                await SavePlayerSquadStateAsync(userId, userState);
                 return false;
             }
             
@@ -184,11 +191,17 @@ namespace Prospect.Server.Api.Services.Squad
             if (member != null)
             {
                 squad.Members.Remove(member);
+                _logger.LogInformation("User {UserId} left squad {SquadId}", userId, squadId);
+            }
+            else
+            {
+                _logger.LogWarning("RemovePlayerFromSquadAsync: Member {UserId} not found in squad {SquadId}", userId, squadId);
             }
             
             // Clear player squad ID
             userState.SquadId = "";
             await SavePlayerSquadStateAsync(userId, userState);
+            _logger.LogInformation("Cleared PlayerSquadState for user {UserId}", userId);
             
             // If this was the leader, assign a new leader or delete the squad
             if (userId == squad.LeaderId)
@@ -196,12 +209,21 @@ namespace Prospect.Server.Api.Services.Squad
                 if (squad.Members.Count > 0)
                 {
                     squad.LeaderId = squad.Members[0].UserId;
+                    _logger.LogInformation("Assigned new leader {LeaderId} for squad {SquadId}", squad.LeaderId, squadId);
                 }
                 else
                 {
                     _squads.TryRemove(squad.SquadId, out _);
+                    _logger.LogInformation("Squad {SquadId} destroyed (no members left)", squad.SquadId);
                     return true;
                 }
+            }
+            // If no members left, destroy the squad
+            if (squad.Members.Count == 0)
+            {
+                _squads.TryRemove(squad.SquadId, out _);
+                _logger.LogInformation("Squad {SquadId} destroyed (no members left)", squad.SquadId);
+                return true;
             }
             
             // Notify remaining squad members
@@ -468,6 +490,26 @@ namespace Prospect.Server.Api.Services.Squad
                 if (!string.IsNullOrEmpty(connectionId))
                 {
                     await _hubContext.Clients.Client(connectionId).SendAsync("SquadUpdated", squad);
+                }
+            }
+        }
+
+        // Periodic cleanup for orphaned squads
+        private void StartOrphanedSquadCleanup()
+        {
+            var timer = new System.Threading.Timer(_ => CleanupOrphanedSquads(), null, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
+        }
+
+        private void CleanupOrphanedSquads()
+        {
+            foreach (var kvp in _squads.ToList())
+            {
+                var squadId = kvp.Key;
+                var squad = kvp.Value;
+                if (squad.Members == null || squad.Members.Count == 0)
+                {
+                    _squads.TryRemove(squadId, out _);
+                    _logger.LogWarning("Orphaned squad {SquadId} cleaned up (no members)", squadId);
                 }
             }
         }

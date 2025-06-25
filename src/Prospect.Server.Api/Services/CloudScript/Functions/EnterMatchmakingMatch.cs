@@ -6,17 +6,18 @@ using Prospect.Server.Api.Services.Auth.Extensions;
 using Prospect.Server.Api.Services.CloudScript.Models;
 using Prospect.Server.Api.Services.Squad;
 using Prospect.Server.Api.Services.UserData;
+using Prospect.Server.Api.Utils;
 
 namespace Prospect.Server.Api.Services.CloudScript.Functions;
 
-public class OnSquadMatchmakingSuccessMessage 
+public class OnSquadMatchmakingSuccessMessage
 {
     [JsonPropertyName("success")]
     public bool Success { get; set; }
-    
+
     [JsonPropertyName("sessionId")]
     public string SessionID { get; set; }
-    
+
     [JsonPropertyName("squadId")]
     public string SquadID { get; set; }
 }
@@ -33,9 +34,9 @@ public class EnterMatchmakingMatchFunction : ICloudScriptFunction<FYEnterMatchAz
 
     public EnterMatchmakingMatchFunction(
         ILogger<EnterMatchmakingMatchFunction> logger,
-        IHubContext<CycleHub> hubContext, 
-        IHttpContextAccessor httpContextAccessor, 
-        UserDataService userDataService, 
+        IHubContext<CycleHub> hubContext,
+        IHttpContextAccessor httpContextAccessor,
+        UserDataService userDataService,
         TitleDataService titleDataService,
         SquadService squadService = null)
     {
@@ -57,43 +58,59 @@ public class EnterMatchmakingMatchFunction : ICloudScriptFunction<FYEnterMatchAz
         }
 
         var userId = context.User.FindAuthUserId();
-        
+
         _logger.LogInformation(
             "[MATCH] EnterMatchmakingMatch called by {UserId} with MapName={MapName}, SquadId={SquadId}",
             userId, request.MapName, request.SquadId ?? "null");
-            
-        // Validate map name format
-        string mapName = request.MapName;
-        if (!mapName.StartsWith("/Game/Maps/"))
-        {
-            // Fix map path format if needed
-            if (mapName == "BrightSands")
-                mapName = "/Game/Maps/MP/BrightSands/BrightSands_P";
-            else if (mapName == "CrescentFalls")
-                mapName = "/Game/Maps/MP/CrescentFalls/CrescentFalls_P";
-            else if (mapName == "TharisIsland")
-                mapName = "/Game/Maps/MP/TharisIsland/TharisIsland_P";
-            
-            _logger.LogInformation("[MATCH] Corrected map name to: {MapName}", mapName);
-        }
 
-        // Generate unique session ID
-        string sessionId = Guid.NewGuid().ToString();
-        
+        // Assume the incoming map name is already normalized
+        string mapName = request.MapName;
+
+        // Use the normalized map name as the session ID
+        string sessionId = mapName;
+
         // Send SignalR notification - CRITICAL for matchmaking!
-        try {
-            _logger.LogInformation("[MATCH] Broadcasting matchmaking success notification");
-            
-            // IMPORTANT: We must broadcast to ALL clients
-            await _hubContext.Clients.All.SendAsync("OnSquadMatchmakingSuccess", 
-                new OnSquadMatchmakingSuccessMessage {
-                    Success = true,
-                    SessionID = mapName,
-                    SquadID = request.SquadId ?? "_"
-                });
-                
-            _logger.LogInformation("[MATCH] Successfully broadcast matchmaking notification");
-        } catch (Exception ex) {
+        try
+        {
+            _logger.LogInformation("[MATCH] Sending matchmaking success notification to the requesting client only");
+
+            // Send only to the requesting client
+            var connectionId = CycleHub.GetConnectionIdForUser(userId);
+            if (!string.IsNullOrEmpty(connectionId))
+            {
+                await _hubContext.Clients.Client(connectionId).SendAsync("OnSquadMatchmakingSuccess",
+                    new OnSquadMatchmakingSuccessMessage
+                    {
+                        Success = true,
+                        SessionID = sessionId, // Now the map name
+                        SquadID = request.SquadId ?? "_"
+                    });
+            }
+            // Squad logic for future use:
+            // If you want to notify all squad members, uncomment and use the following:
+            /*
+            var squad = await _squadService.GetPlayerSquadAsync(userId);
+            if (squad != null)
+            {
+                foreach (var member in squad.Members)
+                {
+                    var memberConnectionId = CycleHub.GetConnectionIdForUser(member.UserId);
+                    if (!string.IsNullOrEmpty(memberConnectionId))
+                    {
+                        await _hubContext.Clients.Client(memberConnectionId).SendAsync("OnSquadMatchmakingSuccess", 
+                            new OnSquadMatchmakingSuccessMessage {
+                                Success = true,
+                                SessionID = mapName,
+                                SquadID = squad.SquadId
+                            });
+                    }
+                }
+            }
+            */
+            _logger.LogInformation("[MATCH] Successfully sent matchmaking notification to the client");
+        }
+        catch (Exception ex)
+        {
             _logger.LogError("[MATCH] Failed to send matchmaking notification: {Error}", ex.Message);
         }
 
@@ -106,7 +123,7 @@ public class EnterMatchmakingMatchFunction : ICloudScriptFunction<FYEnterMatchAz
             NumAttempts = 1,
             Blocker = 0,
             IsMatchTravel = true,  // CRITICAL: must be true
-            SessionId = sessionId,
+            SessionId = sessionId, // Now the map name
         };
     }
 }

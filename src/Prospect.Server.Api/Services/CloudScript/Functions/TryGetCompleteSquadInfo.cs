@@ -48,17 +48,6 @@ public class TryGetCompleteSquadInfo : ICloudScriptFunction<FYTryGetCompleteSqua
 
     public async Task<FYTryGetCompleteSquadInfoResponse> ExecuteAsync(FYTryGetCompleteSquadInfoRequest request)
     {
-        // Check for null or empty squadId
-        if (string.IsNullOrEmpty(request.SquadId) || request.SquadId == "_")
-        {
-            _logger.LogInformation("TryGetCompleteSquadInfo called with invalid squad ID: {SquadId}", request?.SquadId ?? "null");
-            return new FYTryGetCompleteSquadInfoResponse
-            {
-                Success = false,
-                Error = "Invalid squad ID"
-            };
-        }
-
         var context = _httpContextAccessor.HttpContext;
         if (context == null)
         {
@@ -70,10 +59,50 @@ public class TryGetCompleteSquadInfo : ICloudScriptFunction<FYTryGetCompleteSqua
         }
 
         var userId = context.User.FindAuthUserId();
+
+        // If squadId is missing/invalid, try to auto-create a squad for solo players
+        if (string.IsNullOrEmpty(request.SquadId) || request.SquadId == "_")
+        {
+            // Check if player is already in a squad
+            var existingSquad = await _squadService.GetPlayerSquadAsync(userId);
+            if (existingSquad != null)
+            {
+                return new FYTryGetCompleteSquadInfoResponse
+                {
+                    Success = true,
+                    Squad = existingSquad,
+                    Members = existingSquad.Members,
+                    IsUserLeader = userId == existingSquad.LeaderId
+                };
+            }
+
+            // Fetch display name for squad creation
+            var userDataService = (Services.UserData.UserDataService)context.RequestServices.GetService(typeof(Services.UserData.UserDataService));
+            string displayName = "Player";
+            if (userDataService != null)
+            {
+                var userData = await userDataService.FindAsync(userId, userId, new List<string> { "DisplayName" });
+                if (userData.TryGetValue("DisplayName", out var displayNameData))
+                {
+                    displayName = displayNameData.Value;
+                }
+            }
+
+            // Create squad for solo player
+            var squad = await _squadService.CreateSquadAsync(userId, displayName);
+            return new FYTryGetCompleteSquadInfoResponse
+            {
+                Success = true,
+                Squad = squad,
+                Members = squad.Members,
+                IsUserLeader = true
+            };
+        }
+
         _logger.LogInformation("TryGetCompleteSquadInfo called by {UserId} for squad {SquadId}", userId, request.SquadId);
 
-        var squad = _squadService.GetSquad(request.SquadId);
-        if (squad == null)
+        var foundSquad = _squadService.GetSquad(request.SquadId);
+        if (foundSquad == null)
         {
             _logger.LogWarning("Squad {SquadId} not found", request.SquadId);
             return new FYTryGetCompleteSquadInfoResponse
@@ -83,13 +112,13 @@ public class TryGetCompleteSquadInfo : ICloudScriptFunction<FYTryGetCompleteSqua
             };
         }
 
-        bool isUserLeader = userId == squad.LeaderId;
+        bool isUserLeader = userId == foundSquad.LeaderId;
 
         return new FYTryGetCompleteSquadInfoResponse
         {
             Success = true,
-            Squad = squad,
-            Members = squad.Members,
+            Squad = foundSquad,
+            Members = foundSquad.Members,
             IsUserLeader = isUserLeader
         };
     }

@@ -18,4 +18,10 @@ public class PlayFabUser
     [BsonRequired]
     [BsonElement("Auth")]
     public List<PlayFabUserAuth> Auth { get; set; }
+
+    [BsonElement("CreatedAt")]
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    [BsonElement("LastLoginAt")]
+    public DateTime? LastLoginAt { get; set; }
 }

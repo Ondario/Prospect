@@ -27,13 +27,37 @@ internal static class Program
         
         Logger.Information("Starting Prospect.Server.Game");
 
+        // Get server configuration from environment or use defaults
+        var serverPort = int.Parse(Environment.GetEnvironmentVariable("SERVER_PORT") ?? "7777");
+        var defaultMap = Environment.GetEnvironmentVariable("DEFAULT_MAP") ?? "Station"; // Default to Station lobby
+        var gameMode = Environment.GetEnvironmentVariable("GAME_MODE") ?? "/Script/Prospect/YGameMode_Station";
+        
+        // Map name validation and conversion
+        if (!defaultMap.StartsWith("/Game/Maps/"))
+        {
+            // Convert short map names to full paths
+            defaultMap = defaultMap switch
+            {
+                "BrightSands" => "/Game/Maps/MP/BrightSands/BrightSands_P",
+                "CrescentFalls" => "/Game/Maps/MP/CrescentFalls/CrescentFalls_P",
+                "TharisIsland" => "/Game/Maps/MP/TharisIsland/TharisIsland_P",
+                "Station" => "/Game/Maps/MP/Station/Station_P", // Station lobby
+                _ => "/Game/Maps/MP/Station/Station_P" // Default to Station lobby
+            };
+        }
+        
+        Logger.Information("Server Configuration: Port={Port}, Map={Map}, GameMode={GameMode}", 
+            serverPort, defaultMap, gameMode);
+
         // Prospect:
         //  Map:        /Game/Maps/MP/Station/Station_P
         //  GameMode:   /Script/Prospect/YGameMode_Station
         
         var worldUrl = new FUrl
         {
-            Map = "/Game/ThirdPersonCPP/Maps/ThirdPersonExampleMap"
+            Map = defaultMap,
+            Port = serverPort,
+            // GameMode = gameMode
         };
         
         await using (var world = new ProspectWorld())
@@ -41,7 +65,17 @@ internal static class Program
             world.SetGameInstance(new UGameInstance());
             world.SetGameMode(worldUrl);
             world.InitializeActorsForPlay(worldUrl, true);
-            world.Listen();
+            
+            Logger.Information("Starting server on port {Port}", serverPort);
+            if (world.Listen())
+            {
+                Logger.Information("Server started successfully and listening for connections");
+            }
+            else
+            {
+                Logger.Error("Failed to start server");
+                return;
+            }
         
             while (await Tick.WaitForNextTickAsync())
             {

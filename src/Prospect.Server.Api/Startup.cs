@@ -36,7 +36,8 @@ public class Startup
         services.AddSingleton<DbEntityService>();
 
         services.AddSingleton<DbUserDataService>();
-
+        services.AddSingleton<DbFriendService>();
+   
         services.AddHostedService<QosService>();
         services.AddSingleton<QosServer>();
 

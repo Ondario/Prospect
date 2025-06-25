@@ -19,7 +19,7 @@ HANDLE StartProcess(const wchar_t* exePath, DWORD* processID) {
 
     // Command-line arguments to pass to the process
     wchar_t commandLine[MAX_PATH] = L""; // Buffer for full command
-    _snwprintf_s(commandLine, sizeof(commandLine) / sizeof(wchar_t), L"\"%s\" -log -steam_auth PF_TITLEID=2EA46", exePath);
+    _snwprintf_s(commandLine, sizeof(commandLine) / sizeof(wchar_t), L"\"%s\" -log -server -steam_auth PF_TITLEID=2EA46", exePath);
 
     if (CreateProcess(NULL, commandLine, NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, NULL, &si, &pi)) {
         *processID = pi.dwProcessId;

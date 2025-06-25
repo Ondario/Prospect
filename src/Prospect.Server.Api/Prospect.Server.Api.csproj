@@ -24,6 +24,10 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <Compile Remove="Services\CloudScript\Functions\HandleSteamJoinRequest.cs" />
+    </ItemGroup>
+
+    <ItemGroup>
       <PackageReference Include="MongoDB.Driver" Version="2.27.0" />
       <PackageReference Include="Serilog.AspNetCore" Version="8.0.1" />
       <PackageReference Include="Sigil" Version="5.0.0" />
