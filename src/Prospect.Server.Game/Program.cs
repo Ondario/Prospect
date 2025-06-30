@@ -2,7 +2,9 @@
 using Prospect.Unreal.Runtime;
 using Prospect.Server.Game.Services;
 using Serilog;
+using System;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace Prospect.Server.Game;
 
@@ -126,6 +128,42 @@ internal static class Program
         
         await using (var world = new ProspectWorld())
         {
+            // Initialize the world's asset system
+            world.InitializeAssetSystem(assetsBasePath, gameDataService);
+            
+            // Load MAP01 level if using the new asset system
+            bool levelLoaded = false;
+            if (gameDataService != null && requestedMap == "Map01")
+            {
+                Logger.Information("=== LOADING MAP01 LEVEL ===");
+                try
+                {
+                    levelLoaded = await world.LoadLevelAsync("Maps/MP/MAP01/MP_Map01_P");
+                    
+                    if (levelLoaded)
+                    {
+                        var levelStats = world.GetLevelStats();
+                        Logger.Information("MAP01 Level Loading Results:");
+                        Logger.Information("  {LevelStats}", levelStats);
+                        Logger.Information("  Grid-based streaming: {GridCells} cells loaded", levelStats.GridCellsLoaded);
+                        Logger.Information("=== MAP01 LEVEL LOADED SUCCESSFULLY ===");
+                    }
+                    else
+                    {
+                        Logger.Warning("Failed to load MAP01 level, continuing with legacy behavior");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Exception while loading MAP01 level");
+                    Logger.Warning("Continuing with legacy world setup");
+                }
+            }
+            else
+            {
+                Logger.Information("Using legacy world setup (no MAP01 level loading)");
+            }
+
             world.SetGameInstance(new UGameInstance());
             world.SetGameMode(worldUrl);
             world.InitializeActorsForPlay(worldUrl, true);
@@ -133,7 +171,14 @@ internal static class Program
             Logger.Information("Starting server on port {Port}", serverPort);
             if (world.Listen())
             {
-                Logger.Information("Server started successfully and listening for connections");
+                if (levelLoaded)
+                {
+                    Logger.Information("Server started successfully with MAP01 level loaded and listening for connections");
+                }
+                else
+                {
+                    Logger.Information("Server started successfully and listening for connections");
+                }
             }
             else
             {

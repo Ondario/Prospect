@@ -1,4 +1,5 @@
 using Prospect.Unreal.Core;
+using Prospect.Unreal.Core.Math;
 using Prospect.Unreal.Core.Names;
 using Prospect.Unreal.Core.Objects;
 using Prospect.Unreal.Exceptions;
@@ -491,6 +492,31 @@ public abstract partial class UWorld : FNetworkNotify, IAsyncDisposable
         return _levels.Contains(inLevel);
     }
 
+    /// <summary>
+    /// Add a level to the world's levels list (protected for derived classes)
+    /// </summary>
+    /// <param name="level">Level to add</param>
+    protected void AddLevelToWorld(ULevel level)
+    {
+        if (level != null && !_levels.Contains(level))
+        {
+            _levels.Add(level);
+            level.SetOwningWorld(this);  // Fix: Set the owning world
+            Logger.Information("Added level to world: {LevelName}", level.Name);
+        }
+    }
+
+    /// <summary>
+    /// Set the persistent level (protected for derived classes)
+    /// </summary>
+    /// <param name="level">Level to set as persistent</param>
+    protected void SetPersistentLevelInternal(ULevel level)
+    {
+        PersistentLevel = level;
+        level.SetOwningWorld(this);  // Fix: Set the owning world for persistent level
+        Logger.Information("Set persistent level: {LevelName}", level.Name);
+    }
+
     public bool IsServer()
     {
         if (NetDriver != null)
@@ -509,6 +535,19 @@ public abstract partial class UWorld : FNetworkNotify, IAsyncDisposable
     public bool AreActorsInitialized()
     {
         return bActorsInitialized && PersistentLevel != null && PersistentLevel.Actors.Count != 0;
+    }
+    
+    /// <summary>
+    /// Get a spawn point for a new player (virtual method for derived classes)
+    /// </summary>
+    /// <returns>Spawn transform or null if no spawn point available</returns>
+    public virtual FTransform? GetPlayerSpawnTransform()
+    {
+        // Default implementation - return a basic spawn point
+        return new FTransform
+        {
+            Location = new FVector(0, 0, 100)
+        };
     }
     
     public async ValueTask DisposeAsync()

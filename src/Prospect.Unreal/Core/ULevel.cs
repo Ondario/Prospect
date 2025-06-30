@@ -9,7 +9,13 @@ public class ULevel : UObject
     public ULevel()
     {
         Actors = new List<AActor>();
+        Name = "DefaultLevel";
     }
+    
+    /// <summary>
+    ///     Name of this level
+    /// </summary>
+    public string Name { get; set; }
     
     /// <summary>
     ///     URL associated with this level.
@@ -26,7 +32,15 @@ public class ULevel : UObject
     ///     This is not the same as GetOuter(), because GetOuter() for a streaming level is a vestigial world that is not used. 
     ///     It should not be accessed during BeginDestroy(), just like any other UObject references, since GC may occur in any order.
     /// </summary>
-    public UWorld OwningWorld { get; private set; }
+    public UWorld? OwningWorld { get; private set; }
+    
+    /// <summary>
+    ///     Set the owning world for this level
+    /// </summary>
+    public void SetOwningWorld(UWorld world)
+    {
+        OwningWorld = world;
+    }
     
     public void InitializeNetworkActors()
     {
