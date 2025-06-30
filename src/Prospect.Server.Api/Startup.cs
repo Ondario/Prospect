@@ -7,6 +7,7 @@ using Prospect.Server.Api.Services.CloudScript;
 using Prospect.Server.Api.Services.Database;
 using Prospect.Server.Api.Services.Qos;
 using Prospect.Server.Api.Services.UserData;
+using Prospect.Server.Api.Services.ServerManagement;
 using Serilog;
 
 namespace Prospect.Server.Api;
@@ -44,6 +45,9 @@ public class Startup
         services.AddScoped<CloudScriptService>();
         services.AddSingleton<CloudScriptFunctionLoader>();
         services.AddSingleton<Services.Squad.SquadService>();
+        
+        // Server Management Service
+        services.AddSingleton<ServerManagementService>();
 
         services.AddAuthentication(_ =>
             {
