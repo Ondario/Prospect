@@ -44,6 +44,6 @@ public class ULevel : UObject
     
     public void InitializeNetworkActors()
     {
-        throw new NotImplementedException();
+        //throw new NotImplementedException();
     }
 }

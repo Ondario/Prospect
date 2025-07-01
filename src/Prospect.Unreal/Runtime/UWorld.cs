@@ -260,8 +260,7 @@ public abstract partial class UWorld : FNetworkNotify, IAsyncDisposable
         }
         else
         {
-            Logger.Verbose("Level server received: {MessageType}", messageType);
-
+            Logger.Information("Processing control message: {MessageType}", messageType);
             if (!connection.IsClientMsgTypeValid(messageType))
             {
                 Logger.Error("IsClientMsgTypeValid FAILED ({MessageType}): Remote Address = {Address}", (int)messageType, connection.LowLevelGetRemoteAddress());
@@ -427,7 +426,8 @@ public abstract partial class UWorld : FNetworkNotify, IAsyncDisposable
 
                 default:
                 {
-                    throw new NotImplementedException($"Unhandled control message {messageType}");
+                    Logger.Warning("Unhandled control message: {MessageType}", messageType);
+                    break;
                 }
             }
         }
@@ -436,12 +436,17 @@ public abstract partial class UWorld : FNetworkNotify, IAsyncDisposable
     private void WelcomePlayer(UNetConnection connection)
     {
         // TODO: Properly fetch level name from CurrentLevel
-        var levelName = "/Game/Maps/MP/Station/Station_P";
+        //var levelName = "/Game/Maps/MP/Station/Station_P";
         
         // TODO: Properly fetch from AuthorityGameMode
-        var gameName = "/Script/Prospect/YGameMode_Station";
-        var redirectUrl = string.Empty;
+        //var gameName = "/Script/Prospect/YGameMode_Station";
         
+        // Use the actual loaded map and game mode for MAP01
+        var levelName = "/Game/Maps/MP/MAP01/MP_Map01_P";
+        var gameName = "/Script/Prospect/YGameMode_Loop";
+        var redirectUrl = string.Empty;
+
+        Logger.Information("Sending NMT_Welcome to {Address} with level {LevelName} and game mode {GameMode}", connection.LowLevelGetRemoteAddress(), levelName, gameName);
         NMT_Welcome.Send(connection, levelName, gameName, redirectUrl);
 
         connection.FlushNet();

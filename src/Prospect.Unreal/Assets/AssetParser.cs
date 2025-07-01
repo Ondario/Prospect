@@ -624,4 +624,21 @@ namespace Prospect.Unreal.Assets
             return (_loadedAssets.Count, memoryUsage);
         }
     }
+
+    public static class ProspectConfig
+    {
+        public static bool AssetParserLoggingEnabled { get; private set; } = true;
+        static ProspectConfig()
+        {
+            try
+            {
+                if (File.Exists("configuration.json"))
+                {
+                    var json = JObject.Parse(File.ReadAllText("configuration.json"));
+                    AssetParserLoggingEnabled = json["AssetParserLoggingEnabled"]?.Value<bool>() ?? true;
+                }
+            }
+            catch { /* Ignore config errors, default to enabled */ }
+        }
+    }
 } 

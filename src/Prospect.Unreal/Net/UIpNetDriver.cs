@@ -13,17 +13,25 @@ public class UIpNetDriver : UNetDriver
     
     public UIpNetDriver(IPAddress host, int port, bool server)
     {
-        if (server)
+        try
         {
-            ServerIp = new IPEndPoint(host, port);
-            Socket = new UdpClient(ServerIp); // binds to local
+            if (server)
+            {
+                ServerIp = new IPEndPoint(host, port);
+                Socket = new UdpClient(ServerIp); // binds to local
+            }
+            else
+            {
+                Socket = new UdpClient(host.ToString(), port); // binds to remote, establishes local port
+                ServerIp = new IPEndPoint(host, ((IPEndPoint)Socket.Client.LocalEndPoint).Port);
+            }
+            ReceiveThread = new FReceiveThreadRunnable(this);
         }
-        else
+        catch (Exception ex)
         {
-            Socket = new UdpClient(host.ToString(), port); // binds to remote, establishes local port
-            ServerIp = new IPEndPoint(host, ((IPEndPoint)Socket.Client.LocalEndPoint).Port);
+            Logger.Error(ex, "Exception occurred while creating/binding UdpClient in UIpNetDriver. Host: {Host}, Port: {Port}, Server: {Server}", host, port, server);
+            throw;
         }
-        ReceiveThread = new FReceiveThreadRunnable(this);
     }
 
     public IPEndPoint ServerIp { get; }

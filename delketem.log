@@ -1,0 +1,175 @@
+[19:59:01 DBG] (Prospect.Unreal.Assets.AssetParser                  ) Export candidate: Type='World', Class='UScriptClass'World'', Name='MP_Map01_F5_GP', Score=200
+[19:59:01 DBG] (Prospect.Unreal.Assets.AssetParser                  ) Parsing asset Maps/MP/MAP01/GP/MP_Map01_F5_GP: Type='World', Class='UScriptClass'World'', Name='MP_Map01_F5_GP'
+[19:59:01 DBG] (Prospect.Unreal.Assets.AssetParser                  ) Detected Level asset: Maps/MP/MAP01/GP/MP_Map01_F5_GP
+[19:59:01 DBG] (Prospect.Unreal.Assets.AssetParser                  ) Processing array structure with 95 exports for Maps/MP/MAP01/GP/MP_Map01_F5_GP
+[19:59:01 INF] (Prospect.Unreal.Assets.AssetParser                  ) Parsed Level Maps/MP/MAP01/GP/MP_Map01_F5_GP with 51 actors
+[19:59:01 DBG] (Prospect.Unreal.Assets.AssetParser                  ) Export candidate: Type='YWorldSettings', Class='UScriptClass'YWorldSettings'', Name='YWorldSettings', Score=50
+[19:59:01 DBG] (Prospect.Unreal.Assets.AssetParser                  ) Selected Level candidate with score 200 for Maps/MP/MAP01/GP/MP_Map01_F5_GP
+[19:59:01 INF] (Prospect.Unreal.Assets.AssetParser                  ) Successfully loaded asset: Maps/MP/MAP01/GP/MP_Map01_F5_GP as ULevel
+[19:59:01 INF] (Prospect.Server.Game.GridStreamingManager           ) Successfully loaded grid cell F5 with 51 actors
+[19:59:01 INF] (Prospect.Server.Game.ProspectWorld                  ) Grid streaming system initialized successfully
+[19:59:01 INF] (Prospect.Server.Game.ProspectWorld                  ) Expanding PlayerStart search to grid cells...
+[19:59:01 INF] (Prospect.Server.Game.ProspectWorld                  ) Grid cell E4: Found 0 PlayerStart actors
+[19:59:01 INF] (Prospect.Server.Game.ProspectWorld                  ) Grid cell E5: Found 0 PlayerStart actors
+[19:59:01 INF] (Prospect.Server.Game.ProspectWorld                  ) Grid cell F4: Found 0 PlayerStart actors
+[19:59:01 INF] (Prospect.Server.Game.ProspectWorld                  ) Grid cell F5: Found 0 PlayerStart actors
+[19:59:01 INF] (Prospect.Server.Game.ProspectWorld                  ) Expanded PlayerStart search: Added 0 PlayerStarts from 4 grid cells
+[19:59:01 INF] (Prospect.Server.Game.ProspectWorld                  ) Total PlayerStart actors available: 1
+[19:59:01 INF] (Prospect.Server.Game.ProspectWorld                  ) Converted asset level 'MP_Map01_P' to runtime level
+[19:59:01 INF] (Prospect.Unreal.Runtime.UWorld                      ) Added level to world: DefaultLevel
+[19:59:01 INF] (Prospect.Unreal.Runtime.UWorld                      ) Set persistent level: DefaultLevel
+[19:59:01 INF] (Prospect.Server.Game.Program                        ) MAP01 Level Loading Results:
+[19:59:01 INF] (Prospect.Server.Game.Program                        )   Level: MP_Map01_P (Loaded: True, Actors: 484, PlayerStarts: 1, StreamingLevels: 0, GridCells: 4)
+[19:59:01 INF] (Prospect.Server.Game.Program                        )   Grid-based streaming: 4 cells loaded
+[19:59:01 INF] (Prospect.Server.Game.Program                        ) === MAP01 LEVEL LOADED SUCCESSFULLY ===
+[19:59:01 VRB] (Prospect.Unreal.Runtime.UWorld                      ) Failed to add actor, world does not contain level
+[19:59:01 INF] (Prospect.Server.Game.Program                        ) Starting server on port 7777
+[19:59:01 INF] (Prospect.Unreal.Net.FReceiveThreadRunnable          ) Started listening on 0.0.0.0:7777
+[19:59:01 INF] (Prospect.Server.Game.Program                        ) Server started successfully with MAP01 level loaded and listening for connections
+[19:59:34 INF] (Prospect.Unreal.Net.UIpNetDriver                    ) Received from 192.168.0.25:61488 data 0100000000000000000000000000000000000000000000000000000008
+[19:59:34 VRB] (Prospect.Unreal.Net.StatelessConnectHandlerComponent) SendConnectChallenge. Timestamp: 34.03333130478859, Cookie: E8DEC212A86691D6EBE7EBF9282947E5642680D1
+[19:59:34 INF] (Prospect.Unreal.Net.UIpNetDriver                    ) Received from 192.168.0.25:61488 data 0100009A2122080242F7169640358BB45E3F5FCF4749392A2733018C0E
+[19:59:34 VRB] (Prospect.Unreal.Net.StatelessConnectHandlerComponent) SendChallengeAck. InCookie: E8DEC212A86691D6EBE7EBF9282947E5642680D1
+[19:59:34 VRB] (Prospect.Unreal.Net.UIpNetDriver                    ) Server accepting post-challenge connection from: 192.168.0.25:61488
+[19:59:34 VRB] (Prospect.Unreal.Net.UNetConnection                  ) InitSequence: IncomingSequence: 4802, OutgoingSequence: 7912
+[19:59:34 VRB] (Prospect.Unreal.Net.UNetConnection                  ) InitSequence: InitInReliable: 706, InitOutReliable: 744
+[19:59:34 DBG] (Prospect.Unreal.Net.StatelessConnectHandlerComponent) InitFromConnectionless
+[19:59:34 VRB] (Prospect.Unreal.Net.UNetConnection                  ) SetClientLoginState: State changing from Invalid to LoggingIn
+[19:59:34 VRB] (Prospect.Unreal.Net.UNetConnection                  ) SetExpectedClientLoginMsgType: Type same: [Hello]
+[19:59:34 VRB] (Prospect.Unreal.Net.UNetConnection                  ) Created channel 1 of type Voice
+[19:59:34 INF] (Prospect.Unreal.Net.UIpNetDriver                    ) Received from 192.168.0.25:61488 data C0B9272C01000000FCDF04C0B0FF05B0014040B5C4B04C040000000C4E0D0C4E50508E110E4C8E514C0C0CC0
+[19:59:34 WRN] (Prospect.Unreal.Net.UNetConnection                  ) Received out of order packet
+[19:59:34 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:34 INF] (Prospect.Unreal.Net.UIpNetDriver                    ) Received from 192.168.0.25:61488 data C0B9372C0100000014C8
+[19:59:34 WRN] (Prospect.Unreal.Net.UNetConnection                  ) Received out of order packet
+[19:59:34 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:34 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:34 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:34 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:34 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:34 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:34 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:34 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:34 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:34 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:34 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:34 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:34 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:34 INF] (Prospect.Unreal.Net.UIpNetDriver                    ) Received from 192.168.0.25:61488 data C0B9472C010000008CCE
+[19:59:34 WRN] (Prospect.Unreal.Net.UNetConnection                  ) Received out of order packet
+[19:59:34 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:34 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:34 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:34 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:34 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:34 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:34 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:34 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 INF] (Prospect.Unreal.Net.UIpNetDriver                    ) Received from 192.168.0.25:61488 data C0B9572C01000000DCD4
+[19:59:35 WRN] (Prospect.Unreal.Net.UNetConnection                  ) Received out of order packet
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 INF] (Prospect.Unreal.Net.UIpNetDriver                    ) Received from 192.168.0.25:61488 data C0B9672C010000004CDB
+[19:59:35 WRN] (Prospect.Unreal.Net.UNetConnection                  ) Received out of order packet
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 INF] (Prospect.Unreal.Net.UIpNetDriver                    ) Received from 192.168.0.25:61488 data C0B9772C01000000BCC104C0B0FF05B0014040B5C4B04C040000000C4E0D0C4E50508E110E4C8E514C0C0CC0
+[19:59:35 WRN] (Prospect.Unreal.Net.UNetConnection                  ) Received out of order packet
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 INF] (Prospect.Unreal.Net.UIpNetDriver                    ) Received from 192.168.0.25:61488 data C0B9872C0100000044C8
+[19:59:35 WRN] (Prospect.Unreal.Net.UNetConnection                  ) Received out of order packet
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 INF] (Prospect.Unreal.Net.UIpNetDriver                    ) Received from 192.168.0.25:61488 data C0B9972C01000000A4CE
+[19:59:35 WRN] (Prospect.Unreal.Net.UNetConnection                  ) Received out of order packet
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:35 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:36 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:36 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:36 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:36 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:36 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:36 INF] (Prospect.Unreal.Net.UIpNetDriver                    ) Received from 192.168.0.25:61488 data C0B9A72C010000002CD5
+[19:59:36 WRN] (Prospect.Unreal.Net.UNetConnection                  ) Received out of order packet
+[19:59:36 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:36 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:36 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:36 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:36 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:36 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:36 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:36 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:36 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:36 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:36 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:36 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:36 INF] (Prospect.Unreal.Net.UIpNetDriver                    ) Received from 192.168.0.25:61488 data C0B9B72C0100000084DB
+[19:59:36 WRN] (Prospect.Unreal.Net.UNetConnection                  ) Received out of order packet
+[19:59:36 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:36 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:36 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:36 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:36 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:36 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:36 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:36 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:36 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:36 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:36 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:36 DBG] (Prospect.Unreal.Net.UNetConnection                  ) Attempting to send data before handshake is complete. Prospect.Unreal.Net.UIpConnection
+[19:59:36 INF] (Prospect.Unreal.Net.UIpNetDriver                    ) Received from 192.168.0.25:61488 data C0B9C72C01000000F4C104C0B0FF05B0014040B5C4B04C040000000C4E0D0C4E50508E110E4C8E514C0C0CC0
+[19:59:36 WRN] (Prospect.Unreal.Net.UNetConnection                  ) Received out of order packet

@@ -66,28 +66,28 @@ public class RequestServerSessionStateFunction : ICloudScriptFunction<RequestSer
         string mapName = request.SessionID;
         
         // Get or create dedicated server instance for this session
-        var serverInstance = await _serverManagementService.GetOrCreateServerAsync(request.SessionID, mapName);
+        //var serverInstance = await _serverManagementService.GetOrCreateServerAsync(request.SessionID, mapName);
         
-        if (serverInstance.State == ServerState.Error)
-        {
-            throw new InvalidOperationException($"Failed to create server instance for session {request.SessionID}");
-        }
+        //if (serverInstance.State == ServerState.Error)
+        //{
+        //    throw new InvalidOperationException($"Failed to create server instance for session {request.SessionID}");
+        //}
         
         // Return the actual server connection details
-        string serverAddress = serverInstance.GetConnectionString();
+        //string serverAddress = serverInstance.GetConnectionString();
         
-        _logger.LogInformation("[DEDICATED] Returning dedicated server connection: {ServerAddress} for map: {MapName}, session: {SessionID}", 
-            serverAddress, mapName, request.SessionID);
+        //_logger.LogInformation("[DEDICATED] Returning dedicated server connection: {ServerAddress} for map: {MapName}, session: {SessionID}", 
+        //    serverAddress, mapName, request.SessionID);
 
         var response = new RequestServerSessionStateResponse
         {
             CanGoToSession = true,
             ConnectionData = new FYMatchConnectionData
             {
-                Addr = serverAddress,
+                Addr = "192.168.0.25", ///serverAddress,
                 ConnectSinglePlayer = false,
                 IsMatch = true,
-                ServerID = serverInstance.ServerId,
+                ServerID = "1", //serverInstance.ServerId,
                 SessionID = request.SessionID,
             },
             ShouldCancel = false,
