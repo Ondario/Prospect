@@ -637,7 +637,7 @@ public abstract class UNetConnection : UPlayer
                 
             // Parse the bunch.
             var startPos = reader.GetPosBits();
-            var remainingBits = reader.GetMaxPos() - reader.GetPosBits();
+            var remainingBits = reader.GetNumBits() - reader.GetPosBits();
             
             // Skip processing if insufficient data for complete bunch parsing
             // Need minimum ~50 bits for full bunch header parsing
@@ -707,14 +707,14 @@ public abstract class UNetConnection : UPlayer
                     // Skip whatever bits the client is using for channel index
                     // Try common bit widths: 6, 8, 10 bits
                     
-                    var attemptedChannelIndex = (int)reader.ReadInt(64); // Try 6 bits first
+                    var attemptedChannelIndex = (int)reader.ReadInt(6); // Read 6 bits for channel index
                     var bitsConsumed = 6;
                     
-                    // Force to channel 0 (Control) regardless of what we read
-                    bunch.ChIndex = 0;
+                    // Use the actual channel index read from packet
+                    bunch.ChIndex = attemptedChannelIndex;
                     
-                    Logger.Information("DEBUG: FORCED channel index to 0 (Control), read raw value {Raw}, consumed {Bits} bits, position {Before} -> {After}", 
-                        attemptedChannelIndex, bitsConsumed, originalPos, reader.GetPosBits());
+                    Logger.Information("DEBUG: Read channel index {ChIndex}, raw value {Raw}, consumed {Bits} bits, position {Before} -> {After}", 
+                        bunch.ChIndex, attemptedChannelIndex, bitsConsumed, originalPos, reader.GetPosBits());
                     var afterPackedPos = reader.GetPosBits();
                     
                     Logger.Information("DEBUG: Read channel index {ChIndex} using {Bits} bits, position {Before} -> {After}", 
@@ -780,20 +780,33 @@ public abstract class UNetConnection : UPlayer
                 bunch.bPartialFinal = bunch.bPartial && reader.ReadBit();
                 Logger.Information("DEBUG: Read bPartialFinal={Flag}, position now {Pos}", bunch.bPartialFinal, reader.GetPosBits());
                 
-                if (bunch.EngineNetVer() < EEngineNetworkVersionHistory.HISTORY_CHANNEL_NAMES)
+                // FORCE LEGACY CHANNEL NAME LOGIC - Client seems to use old channel encoding
+                // Despite reporting EngineNetVer 17, bypass version check to use integer-based channel types
+                Logger.Information("DEBUG: Using FORCED legacy channel name logic (client EngineNetVer={Ver})", bunch.EngineNetVer());
+                if (true) // bunch.EngineNetVer() < EEngineNetworkVersionHistory.HISTORY_CHANNEL_NAMES
                 {
                     bunch.ChType = ((bunch.bReliable || bunch.bOpen) ? (EChannelType) reader.ReadInt((int) EChannelType.CHTYPE_MAX) : EChannelType.CHTYPE_None);
+                    Logger.Information("DEBUG: Read legacy ChType={ChType} (raw={Raw}) at position {Pos}", 
+                        bunch.ChType, (int)bunch.ChType, reader.GetPosBits());
 
                     switch (bunch.ChType)
                     {
                         case EChannelType.CHTYPE_Control:
                             bunch.ChName = EName.Control;
+                            bunch.ChIndex = 0; // Control channel is always index 0
                             break;
                         case EChannelType.CHTYPE_Voice:
                             bunch.ChName = EName.Voice;
+                            bunch.ChIndex = 1; // Voice channel is always index 1
                             break;
                         case EChannelType.CHTYPE_Actor:
                             bunch.ChName = EName.Actor;
+                            // Keep the read channel index for Actor channels (they can be dynamic)
+                            break;
+                        default:
+                            Logger.Warning("Unknown channel type {ChType}, defaulting to Control", bunch.ChType);
+                            bunch.ChName = EName.Control;
+                            bunch.ChIndex = 0;
                             break;
                     }
                 }
@@ -801,8 +814,20 @@ public abstract class UNetConnection : UPlayer
                 {
                     if (bunch.bReliable || bunch.bOpen)
                     {
+                        var beforeAlignment = reader.GetPosBits();
                         Logger.Information("DEBUG: About to read channel name - position {Pos}, bReliable={Reliable}, bOpen={Open}", 
-                            reader.GetPosBits(), bunch.bReliable, bunch.bOpen);
+                            beforeAlignment, bunch.bReliable, bunch.bOpen);
+                        
+                        // CRITICAL: FString.Deserialize expects byte-aligned reading for Int32 length
+                        // Force alignment to next byte boundary before reading channel name
+                        var alignedPos = (beforeAlignment + 7) & ~7; // Round up to next byte boundary
+                        if (alignedPos != beforeAlignment)
+                        {
+                            Logger.Information("DEBUG: Forcing byte alignment from position {Before} to {After} (skipped {Bits} bits)", 
+                                beforeAlignment, alignedPos, alignedPos - beforeAlignment);
+                            reader.Pos = alignedPos;
+                        }
+                        
                         FName? chName = null;
                         
                         if (!UPackageMap.StaticSerializeName(reader, ref chName) || reader.IsError())
@@ -846,11 +871,15 @@ public abstract class UNetConnection : UPlayer
                     return;
                 }
 
-                var bunchDataBits = reader.ReadInt((uint)(MaxPacket * 8));
+                // Calculate remaining bits for bunch data
                 var headerPos = reader.GetPosBits();
-                if (reader.IsError())
+                var bunchDataBits = reader.GetNumBits() - headerPos;
+                Logger.Information("DEBUG: Bunch data calculation - headerPos: {HeaderPos}, totalBits: {TotalBits}, bunchDataBits: {BunchDataBits}", 
+                    headerPos, reader.GetNumBits(), bunchDataBits);
+                
+                if (reader.IsError() || bunchDataBits < 0)
                 {
-                    Logger.Error("Bunch header overflow");
+                    Logger.Error("Bunch header overflow or insufficient data");
                     Close();
                     return;
                 }
@@ -866,7 +895,8 @@ public abstract class UNetConnection : UPlayer
 
                 if (bunch.bHasPackageMapExports)
                 {
-                    throw new NotImplementedException();
+                    Logger.Verbose("Skipping PackageMapExports processing in main packet loop. Channel: {ChIndex}", bunch.ChIndex);
+                    // TODO: Process package map exports in main packet loop - for now just skip
                 }
 
                 if (bunch.bReliable)
@@ -911,14 +941,27 @@ public abstract class UNetConnection : UPlayer
                 // In that case, we can generally ignore these bunches.
                 if (_bInternalAck /* && _bAllowExistingChannelIndex */)
                 {
-                    throw new NotImplementedException();
+                    Logger.Verbose("Skipping rollback data processing for 100% reliable connection. Channel: {ChIndex}", bunch.ChIndex);
+                    // TODO: Process rollback data for reliable connections - for now just skip
+                    continue;
                 }
                 
-                // Ignore if reliable packet has already been processed.
+                // EXCEPTION: For opening bunches, allow the first reliable packet to reset the sequence
                 if (bunch.bReliable && bunch.ChSequence <= InReliable[bunch.ChIndex])
                 {
-                    Logger.Warning("Received outdated bunch (Channel {Ch} Current Sequence {Seq})", bunch.ChIndex, InReliable[bunch.ChIndex]);
-                    continue;
+                    if (bunch.bOpen && (channel == null || (channel.OpenedLocally && !channel.OpenAcked)))
+                    {
+                        // This is an opening bunch for a new channel OR a pre-existing channel that needs sequence reset
+                        // (Control channels are pre-created by server but need alignment with client sequence)
+                        Logger.Information("Resetting channel {Ch} sequence from {OldSeq} to {NewSeq} for opening bunch", 
+                            bunch.ChIndex, InReliable[bunch.ChIndex], bunch.ChSequence - 1);
+                        InReliable[bunch.ChIndex] = bunch.ChSequence - 1;
+                    }
+                    else
+                    {
+                        Logger.Warning("Received outdated bunch (Channel {Ch} Current Sequence {Seq})", bunch.ChIndex, InReliable[bunch.ChIndex]);
+                        continue;
+                    }
                 }
 
                 // If opening the channel with an unreliable packet, check that it is "bNetTemporary", otherwise discard it
@@ -979,7 +1022,8 @@ public abstract class UNetConnection : UPlayer
                     // peek for guid
                     if (_bInternalAck /* && bIgnoreActorBunches */)
                     {
-                        throw new NotImplementedException();
+                        Logger.Verbose("Skipping GUID peek for reliable connection. Channel: {ChIndex}", bunch.ChIndex);
+                        // TODO: Peek for GUID in reliable connection - for now just skip
                     }
                     
                     // Reliable (either open or later), so create new channel.

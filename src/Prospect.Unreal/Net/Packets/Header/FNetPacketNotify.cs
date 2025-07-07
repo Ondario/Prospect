@@ -247,7 +247,7 @@ public class FNetPacketNotify
 
             var bReportAcked = _inAckSeq.Equals(ackedSeq) ? isAck : false;
             
-            Logger.Verbose("AckSeq - AckedSeq: {Seq}, IsAck {IsAck}", _inAckSeq.Value, bReportAcked);
+            // Logger.Verbose("AckSeq - AckedSeq: {Seq}, IsAck {IsAck}", _inAckSeq.Value, bReportAcked);
 
             _inSeqHistory.AddDeliveryStatus(bReportAcked);
         }

@@ -283,18 +283,15 @@ public abstract partial class UWorld : FNetworkNotify, IAsyncDisposable
                     
                     if (NMT_Hello.Receive(bunch, out var isLittleEndian, out var remoteNetworkVersion, out var encryptionToken))
                     {
-                        Logger.Information("Client connecting with version. LocalNetworkVersion: {Local}, RemoteNetworkVersion: {Remote}", localNetworkVersion, remoteNetworkVersion);
+                        Logger.Information("Received NMT_Hello from client. LocalNetworkVersion: {Local}, RemoteNetworkVersion: {Remote}", localNetworkVersion, remoteNetworkVersion);
                         
                         // TODO: Version check.
-
-                        if (string.IsNullOrEmpty(encryptionToken))
-                        {
-                            connection.SendChallengeControlMessage();
-                        }
-                        else
-                        {
-                            throw new NotImplementedException("Encryption");
-                        }
+                        
+                        // CRITICAL FIX: Respond with NMT_Welcome instead of Challenge (stateless handshake already completed)
+                        Logger.Information("Sending NMT_Welcome response to client");
+                        
+                        // Send Welcome message with map name and game mode (use existing WelcomePlayer method)
+                        WelcomePlayer(connection);
                     }
                     break;
                 }

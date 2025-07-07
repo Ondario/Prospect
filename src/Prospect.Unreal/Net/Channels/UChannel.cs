@@ -163,7 +163,8 @@ public abstract class UChannel
         // If a replay fails to create a channel, we want to salvage as much as possible
         if (bunch.bHasPackageMapExports && !Connection!.IsInternalAck())
         {
-            throw new NotImplementedException();
+            Logger.Verbose("Skipping PackageMapExports processing for now. Channel: {ChIndex}", ChIndex);
+            // TODO: Process package map exports - for now just skip
         }
 
         if (Connection!.IsInternalAck() && Broken)
@@ -183,8 +184,11 @@ public abstract class UChannel
                 throw new UnrealNetException("Invalid bunch");
             }
 
-            // TODO: (InRec) Queue
-            throw new NotImplementedException();
+            // TODO: (InRec) Queue - For now, skip out-of-order reliable packets
+            Logger.Warning("Skipping out-of-order reliable bunch. Expected: {Expected}, Got: {Got}, Channel: {ChIndex}", 
+                Connection.InReliable[ChIndex] + 1, bunch.ChSequence, ChIndex);
+            bOutSkipAck = true;
+            return;
         }
         else
         {
@@ -201,10 +205,11 @@ public abstract class UChannel
                 return;
             }
             
-            // TODO: (InRec) Dispatch waiting bunches
-            while (InRec != null)
+            // TODO: (InRec) Dispatch waiting bunches - For now, skip queued bunch processing
+            if (InRec != null)
             {
-                throw new NotImplementedException();
+                Logger.Verbose("Skipping queued bunch processing for now. Channel: {ChIndex}", ChIndex);
+                InRec = null; // Clear the queue for now
             }
         }
     }
