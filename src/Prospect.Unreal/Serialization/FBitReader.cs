@@ -127,6 +127,10 @@ public class FBitReader : FArchive
 
     public override bool ReadBit()
     {
+        if (Pos >= BufferBits.Length)
+        {
+            throw new UnrealSerializationException($"ReadBit: Position {Pos} exceeds BitArray length {BufferBits.Length}. Buffer size: {Buffer.Length} bytes, Num bits: {Num}");
+        }
         return BufferBits[(int) Pos++];
     }
 

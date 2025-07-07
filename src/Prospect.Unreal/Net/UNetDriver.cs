@@ -8,11 +8,13 @@ using Prospect.Unreal.Net.Channels.Actor;
 using Prospect.Unreal.Net.Channels.Control;
 using Prospect.Unreal.Net.Channels.Voice;
 using Prospect.Unreal.Runtime;
+using Serilog;
 
 namespace Prospect.Unreal.Net;
 
 public abstract class UNetDriver : IAsyncDisposable
 {
+    private static readonly ILogger Logger = Log.ForContext<UNetDriver>();
     private double _elapsedTime;
     
     protected UNetDriver()
@@ -22,8 +24,8 @@ public abstract class UNetDriver : IAsyncDisposable
         ChannelDefinitionMap = new Dictionary<FName, FChannelDefinition>();
         ChannelDefinitions = new List<FChannelDefinition>
         {
-            new FChannelDefinition(EName.Control, typeof(string), 0, true, false, true, false, true),
-            new FChannelDefinition(EName.Voice, typeof(string), 1, true, true, true, true, true),
+            new FChannelDefinition(EName.Control, typeof(string), 0, true, false, true, true, true),
+            new FChannelDefinition(EName.Voice, typeof(string), 1, false, true, true, false, true),
             new FChannelDefinition(EName.Actor, typeof(string), -1, false, true, false, false, false)
         };
         ClientConnections = new List<UNetConnection>();
@@ -242,10 +244,17 @@ public abstract class UNetDriver : IAsyncDisposable
 
     private void CreateInitialServerChannels(UNetConnection clientConnection)
     {
+        Logger.Information("Creating initial server channels for connection {Address}", clientConnection.LowLevelGetRemoteAddress());
+        
         foreach (var channelDef in ChannelDefinitions)
         {
+            Logger.Information("Channel definition: {Name}, StaticIndex: {Index}, InitialServer: {InitialServer}", 
+                channelDef.Name, channelDef.StaticChannelIndex, channelDef.InitialServer);
+                
             if (channelDef.InitialServer)
             {
+                Logger.Information("Creating initial server channel: {Name} at index {Index}", 
+                    channelDef.Name, channelDef.StaticChannelIndex);
                 clientConnection.CreateChannelByName(channelDef.Name, EChannelCreateFlags.OpenedLocally, channelDef.StaticChannelIndex);
             }
         }

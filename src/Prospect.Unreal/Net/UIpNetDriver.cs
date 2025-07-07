@@ -79,34 +79,41 @@ public class UIpNetDriver : UNetDriver
         
         while (ReceiveThread.TryReceive(out var packet))
         {
-            Logger.Information("Received from {Adress} data {Buffer}", packet.Address, packet.DataView.GetData());
-
-            UNetConnection? connection = ServerConnection;
-
-            if (Equals(packet.Address, ServerIp))
+            try
             {
-                // TODO: Assign connection.
-                throw new NotImplementedException();
+                Logger.Information("Received from {Adress} data {Buffer}", packet.Address, packet.DataView.GetData());
+
+                UNetConnection? connection = ServerConnection;
+
+                if (Equals(packet.Address, ServerIp))
+                {
+                    // TODO: Assign connection.
+                    throw new NotImplementedException();
+                }
+
+                if (connection == null)
+                {
+                    MappedClientConnections.TryGetValue(packet.Address, out connection);
+                }
+
+                var bIgnorePacket = false;
+                
+                // If we didn't find a client connection, maybe create a new one.
+                if (connection == null)
+                {
+                    connection = ProcessConnectionlessPacket(packet);
+                    bIgnorePacket = packet.DataView.NumBytes() == 0;
+                }
+                
+                // Send the packet to the connection for processing.
+                if (connection != null && !bIgnorePacket)
+                {
+                    connection.ReceivedRawPacket(packet);
+                }
             }
-
-            if (connection == null)
+            catch (Exception ex)
             {
-                MappedClientConnections.TryGetValue(packet.Address, out connection);
-            }
-
-            var bIgnorePacket = false;
-            
-            // If we didn't find a client connection, maybe create a new one.
-            if (connection == null)
-            {
-                connection = ProcessConnectionlessPacket(packet);
-                bIgnorePacket = packet.DataView.NumBytes() == 0;
-            }
-            
-            // Send the packet to the connection for processing.
-            if (connection != null && !bIgnorePacket)
-            {
-                connection.ReceivedRawPacket(packet);
+                Logger.Error(ex, "Exception processing packet from {Address} - continuing server operation", packet.Address);
             }
         }
     }

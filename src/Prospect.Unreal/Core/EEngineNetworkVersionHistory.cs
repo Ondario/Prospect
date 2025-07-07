@@ -18,6 +18,7 @@ public enum EEngineNetworkVersionHistory : uint
     HISTORY_JITTER_IN_HEADER = 14,					// Bump version since we added jitter clock time to packet headers and removed remote saturation
     HISTORY_CLASSNETCACHE_FULLNAME = 15,			// Bump version to use full paths in GetNetFieldExportGroupForClassNetCache
     HISTORY_REPLAY_DORMANCY = 16,					// Bump version to support dormancy properly in replays
+    HISTORY_CLIENT_COMPAT_VERSION = 17,             // Bump version to match client compatibility (The Cycle: Frontier)
     
     HISTORY_ENGINENETVERSION_PLUS_ONE,
     HISTORY_ENGINENETVERSION_LATEST = HISTORY_ENGINENETVERSION_PLUS_ONE - 1,

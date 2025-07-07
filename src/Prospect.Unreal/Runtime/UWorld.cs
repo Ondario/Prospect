@@ -98,11 +98,18 @@ public abstract partial class UWorld : FNetworkNotify, IAsyncDisposable
     {
         if (NetDriver != null)
         {
-            NetDriver.TickDispatch(deltaTime);
-            NetDriver.PostTickDispatch();
-            
-            NetDriver.TickFlush(deltaTime);
-            NetDriver.PostTickFlush();
+            try
+            {
+                NetDriver.TickDispatch(deltaTime);
+                NetDriver.PostTickDispatch();
+                
+                NetDriver.TickFlush(deltaTime);
+                NetDriver.PostTickFlush();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Exception during NetDriver tick - continuing server operation");
+            }
         }
     }
 

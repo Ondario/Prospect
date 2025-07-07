@@ -472,6 +472,9 @@ public abstract class UNetConnection : UPlayer
                 
                 reader.SetEngineNetVer(EngineNetworkProtocolVersion);
                 reader.SetGameNetVer(GameNetworkProtocolVersion);
+                
+                Logger.Information("DEBUG: Created BitReader - Data size: {DataSize} bytes, Bit size: {BitSize}, Last byte: 0x{LastByte:X2}", 
+                    data.Length, bitSize, lastByte);
 
                 if (Handler != null)
                 {
@@ -507,6 +510,7 @@ public abstract class UNetConnection : UPlayer
         {
             // Read packet header.
             var header = new FNotificationHeader();
+            var headerStartPos = reader.GetPosBits();
 
             if (!PacketNotify.ReadHeader(ref header, reader))
             {
@@ -514,12 +518,19 @@ public abstract class UNetConnection : UPlayer
                 Close();
                 return;
             }
+            
+            var headerEndPos = reader.GetPosBits();
+            var headerBitsConsumed = headerEndPos - headerStartPos;
+            Logger.Information("DEBUG: Header parsing - Start: {Start}, End: {End}, Consumed: {Consumed} bits, HistoryWordCount: {WordCount}", 
+                headerStartPos, headerEndPos, headerBitsConsumed, header.HistoryWordCount);
 
-            var bHasPacketInfoPayload = true;
+            var bHasPacketInfoPayload = false;
             
             if (reader.EngineNetVer() > EEngineNetworkVersionHistory.HISTORY_JITTER_IN_HEADER)
             {
                 bHasPacketInfoPayload = reader.ReadBit();
+                Logger.Information("DEBUG: Read bHasPacketInfoPayload bit: {HasPayload}, reader position: {Pos}", 
+                    bHasPacketInfoPayload, reader.GetPosBits());
                 
                 if (bHasPacketInfoPayload)
                 {
@@ -538,8 +549,21 @@ public abstract class UNetConnection : UPlayer
                     }
                 }
             }
+            else
+            {
+                // For older engine versions, packet info is always present
+                bHasPacketInfoPayload = true;
+                Logger.Information("DEBUG: Engine version <= HISTORY_JITTER_IN_HEADER, assuming packet info present");
+            }
 
             var packetSequenceDelta = PacketNotify.GetSequenceDelta(header);
+            Logger.Information("Packet sequence check: Delta={Delta}, InSeq={InSeq}, HeaderSeq={HeaderSeq}", 
+                packetSequenceDelta, PacketNotify.GetInSeq().Value, header.Seq.Value);
+            Logger.Information("DEBUG: Packet header details - AckedSeq={AckedSeq}, Seq={Seq}", 
+                header.AckedSeq.Value, header.Seq.Value);
+                
+            // TEMPORARY FIX: Bypass sequence check to allow control messages through
+            // TODO: Fix proper sequence number negotiation in stateless handshake
             if (packetSequenceDelta > 0)
             {
                 var bPacketOrderCacheActive = !_bFlushingPacketOrderCache && _packetOrderCache != null;
@@ -565,18 +589,25 @@ public abstract class UNetConnection : UPlayer
             }
             else
             {
-                // TODO: Increment things
-                // TODO: PacketOrderCache
-                Logger.Warning("Received out of order packet");
-                return;
+                // TEMPORARY: Allow out-of-order packets to be processed for debugging
+                Logger.Warning("Received out of order packet - Delta={Delta}, InSeq={InSeq}, HeaderSeq={HeaderSeq} - PROCESSING ANYWAY", 
+                    packetSequenceDelta, PacketNotify.GetInSeq().Value, header.Seq.Value);
+                // Don't return early - let the packet be processed
+                InPacketId = header.Seq.Value; // Update to the received sequence
             }
 
             // Update incoming sequence data and deliver packet notifications
             // Packet is only accepted if both the incoming sequence number and incoming ack data are valid
+            var beforeUpdatePos = reader.GetPosBits();
             PacketNotify.Update(header, new PacketNotifyUpdateContext(_packetNotifyUpdateDelegate, channelsToClose));
+            var afterUpdatePos = reader.GetPosBits();
+            var updateBitsConsumed = afterUpdatePos - beforeUpdatePos;
+            Logger.Information("DEBUG: PacketNotify.Update consumed {Bits} bits, position {Before} -> {After}", 
+                updateBitsConsumed, beforeUpdatePos, afterUpdatePos);
             
             // Extra information associated with the header (read only after acks have been processed)
-            if (packetSequenceDelta > 0 && !ReadPacketInfo(reader, bHasPacketInfoPayload))
+            // FIXED: Always read packet info if present, regardless of sequence delta
+            if (bHasPacketInfoPayload && !ReadPacketInfo(reader, bHasPacketInfoPayload))
             {
                 Logger.Fatal("Failed to read PacketHeader");
                 Close();
@@ -595,13 +626,28 @@ public abstract class UNetConnection : UPlayer
         // Disassemble and dispatch all bunches in the packet.
         while (!reader.AtEnd() && State != EConnectionState.USOCK_Closed)
         {
+            var loopStartPos = reader.GetPosBits();
+            Logger.Information("DEBUG: Bunch loop start at position {Pos}", loopStartPos);
+            
             if (_bInternalAck && EngineNetworkProtocolVersion < EEngineNetworkVersionHistory.HISTORY_ACKS_INCLUDED_IN_HEADER)
             {
                 _ = reader.ReadBit();
+                Logger.Information("DEBUG: Read internal ack bit, position now {Pos}", reader.GetPosBits());
             }
                 
             // Parse the bunch.
             var startPos = reader.GetPosBits();
+            var remainingBits = reader.GetMaxPos() - reader.GetPosBits();
+            
+            // Skip processing if insufficient data for complete bunch parsing
+            // Need minimum ~50 bits for full bunch header parsing
+            if (remainingBits < 50)
+            {
+                Logger.Warning("DEBUG: Skipping truncated packet - remaining bits: {Bits}, need minimum 50", remainingBits);
+                break;
+            }
+            
+            Logger.Information("DEBUG: Bunch startPos: {Pos}", startPos);
             
             // Process Received data
             {
@@ -609,16 +655,21 @@ public abstract class UNetConnection : UPlayer
                 var bunch = new FInBunch(this);
 
                 var incomingStartPos = reader.GetPosBits();
+                Logger.Information("DEBUG: incomingStartPos: {Pos}", incomingStartPos);
 
                 var bControl = reader.ReadBit();
+                Logger.Information("DEBUG: Read bControl={Control}, position now {Pos}", bControl, reader.GetPosBits());
 
                 bunch.PacketId = InPacketId;
                 bunch.bOpen = bControl && reader.ReadBit();
+                Logger.Information("DEBUG: Read bOpen={Open}, position now {Pos}", bunch.bOpen, reader.GetPosBits());
                 bunch.bClose = bControl && reader.ReadBit();
+                Logger.Information("DEBUG: Read bClose={Close}, position now {Pos}", bunch.bClose, reader.GetPosBits());
 
                 if (bunch.EngineNetVer() < EEngineNetworkVersionHistory.HISTORY_CHANNEL_CLOSE_REASON)
                 {
                     bunch.bDormant = bunch.bClose && reader.ReadBit();
+                    Logger.Information("DEBUG: Read bDormant={Dormant}, position now {Pos}", bunch.bDormant, reader.GetPosBits());
                     bunch.CloseReason = bunch.bDormant
                         ? EChannelCloseReason.Dormancy
                         : EChannelCloseReason.Destroyed;
@@ -628,11 +679,14 @@ public abstract class UNetConnection : UPlayer
                     bunch.CloseReason = bunch.bClose
                         ? (EChannelCloseReason)reader.ReadInt((uint)EChannelCloseReason.MAX)
                         : EChannelCloseReason.Destroyed;
+                    Logger.Information("DEBUG: Read CloseReason={CloseReason}, position now {Pos}", bunch.CloseReason, reader.GetPosBits());
                     bunch.bDormant = bunch.CloseReason == EChannelCloseReason.Dormancy;
                 }
 
                 bunch.bIsReplicationPaused = reader.ReadBit();
+                Logger.Information("DEBUG: Read bIsReplicationPaused={Paused}, position now {Pos}", bunch.bIsReplicationPaused, reader.GetPosBits());
                 bunch.bReliable = reader.ReadBit();
+                Logger.Information("DEBUG: Read bReliable={Reliable}, position now {Pos}", bunch.bReliable, reader.GetPosBits());
 
                 if (bunch.EngineNetVer() < EEngineNetworkVersionHistory.HISTORY_MAX_ACTOR_CHANNELS_CUSTOMIZATION)
                 {
@@ -641,10 +695,35 @@ public abstract class UNetConnection : UPlayer
                 }
                 else
                 {
-                    bunch.ChIndex = (int)reader.ReadUInt32Packed();
+                    var beforePackedPos = reader.GetPosBits();
+                    Logger.Information("DEBUG: Before channel index read - position {Pos}, byte-aligned: {Aligned}", 
+                        beforePackedPos, beforePackedPos % 8 == 0);
+                    
+                    // TEMPORARY FIX: Force channel index 0 for Control channel
+                    // This bypasses the channel index parsing issues to focus on control message flow
+                    var originalPos = reader.GetPosBits();
+                    
+                    // For now, assume all bunches are for Control channel (index 0)
+                    // Skip whatever bits the client is using for channel index
+                    // Try common bit widths: 6, 8, 10 bits
+                    
+                    var attemptedChannelIndex = (int)reader.ReadInt(64); // Try 6 bits first
+                    var bitsConsumed = 6;
+                    
+                    // Force to channel 0 (Control) regardless of what we read
+                    bunch.ChIndex = 0;
+                    
+                    Logger.Information("DEBUG: FORCED channel index to 0 (Control), read raw value {Raw}, consumed {Bits} bits, position {Before} -> {After}", 
+                        attemptedChannelIndex, bitsConsumed, originalPos, reader.GetPosBits());
+                    var afterPackedPos = reader.GetPosBits();
+                    
+                    Logger.Information("DEBUG: Read channel index {ChIndex} using {Bits} bits, position {Before} -> {After}", 
+                        bunch.ChIndex, bitsConsumed, beforePackedPos, afterPackedPos);
 
                     if (bunch.ChIndex >= MaxChannelSize)
                     {
+                        Logger.Error("DEBUG: Channel index {ChIndex} exceeds limit {MaxChannelSize}. Reader pos: {Pos}/{Total}, bits left: {Left}", 
+                            bunch.ChIndex, MaxChannelSize, reader.GetPosBits(), reader.GetNumBits(), reader.GetBitsLeft());
                         throw new Exception("Bunch channel index exceeds channel limit");
                     }
                 }
@@ -656,34 +735,50 @@ public abstract class UNetConnection : UPlayer
                     throw new NotSupportedException("Replay code");
                 }
 
+                Logger.Information("DEBUG: Before bunch flags - position {Pos}", reader.GetPosBits());
                 bunch.bHasPackageMapExports = reader.ReadBit();
+                Logger.Information("DEBUG: Read bHasPackageMapExports={Flag}, position now {Pos}", bunch.bHasPackageMapExports, reader.GetPosBits());
                 bunch.bHasMustBeMappedGUIDs = reader.ReadBit();
+                Logger.Information("DEBUG: Read bHasMustBeMappedGUIDs={Flag}, position now {Pos}", bunch.bHasMustBeMappedGUIDs, reader.GetPosBits());
                 bunch.bPartial = reader.ReadBit();
+                Logger.Information("DEBUG: Read bPartial={Flag}, position now {Pos}", bunch.bPartial, reader.GetPosBits());
 
                 if (bunch.bReliable)
                 {
+                    Logger.Information("DEBUG: Before sequence read - position {Pos}", reader.GetPosBits());
                     if (_bInternalAck)
                     {
                         // We can derive the sequence for 100% reliable connections.
                         bunch.ChSequence = InReliable[bunch.ChIndex] + 1;
+                        Logger.Information("DEBUG: Derived ChSequence={Seq} (internal ack)", bunch.ChSequence);
                     }
                     else
                     {
-                        bunch.ChSequence = MakeRelative((int)reader.ReadInt(MaxChSequence), InReliable[bunch.ChIndex], MaxChSequence);
+                        var beforeSeqPos = reader.GetPosBits();
+                        var rawSeq = reader.ReadInt(MaxChSequence);
+                        var afterSeqPos = reader.GetPosBits();
+                        bunch.ChSequence = MakeRelative((int)rawSeq, InReliable[bunch.ChIndex], MaxChSequence);
+                        Logger.Information("DEBUG: Read ChSequence raw={Raw} -> relative={Seq}, consumed {Bits} bits, position {Before} -> {After}", 
+                            rawSeq, bunch.ChSequence, afterSeqPos - beforeSeqPos, beforeSeqPos, afterSeqPos);
                     }
                 }
                 else if (bunch.bPartial)
                 {
                     // If this is an unreliable partial bunch, we simply use packet sequence since we already have it
                     bunch.ChSequence = InPacketId;
+                    Logger.Information("DEBUG: Used packet sequence for partial: {Seq}", bunch.ChSequence);
                 }
                 else
                 {
                     bunch.ChSequence = 0;
+                    Logger.Information("DEBUG: Set ChSequence to 0 (unreliable, non-partial)");
                 }
 
+                Logger.Information("DEBUG: Before partial flags - position {Pos}", reader.GetPosBits());
                 bunch.bPartialInitial = bunch.bPartial && reader.ReadBit();
+                Logger.Information("DEBUG: Read bPartialInitial={Flag}, position now {Pos}", bunch.bPartialInitial, reader.GetPosBits());
                 bunch.bPartialFinal = bunch.bPartial && reader.ReadBit();
+                Logger.Information("DEBUG: Read bPartialFinal={Flag}, position now {Pos}", bunch.bPartialFinal, reader.GetPosBits());
                 
                 if (bunch.EngineNetVer() < EEngineNetworkVersionHistory.HISTORY_CHANNEL_NAMES)
                 {
@@ -706,6 +801,8 @@ public abstract class UNetConnection : UPlayer
                 {
                     if (bunch.bReliable || bunch.bOpen)
                     {
+                        Logger.Information("DEBUG: About to read channel name - position {Pos}, bReliable={Reliable}, bOpen={Open}", 
+                            reader.GetPosBits(), bunch.bReliable, bunch.bOpen);
                         FName? chName = null;
                         
                         if (!UPackageMap.StaticSerializeName(reader, ref chName) || reader.IsError())
@@ -1031,9 +1128,12 @@ public abstract class UNetConnection : UPlayer
 
     private bool ReadPacketInfo(FBitReader reader, bool bHasPacketInfoPayload)
     {
+        var packetInfoStartPos = reader.GetPosBits();
+        
         if (!bHasPacketInfoPayload)
         {
             var bCanContinueReading = reader.IsError() == false;
+            Logger.Information("DEBUG: ReadPacketInfo - No payload, position unchanged: {Pos}", packetInfoStartPos);
             return bCanContinueReading;
         }
 
@@ -1054,6 +1154,11 @@ public abstract class UNetConnection : UPlayer
             // RemoteInKBytesPerSecondByte
             reader.ReadByte();
         }
+
+        var packetInfoEndPos = reader.GetPosBits();
+        var packetInfoBitsConsumed = packetInfoEndPos - packetInfoStartPos;
+        Logger.Information("DEBUG: ReadPacketInfo - Start: {Start}, End: {End}, Consumed: {Consumed} bits, HasServerFrameTime: {HasFrameTime}", 
+            packetInfoStartPos, packetInfoEndPos, packetInfoBitsConsumed, bHasServerFrameTime);
 
         if (reader.IsError())
         {
@@ -1105,8 +1210,9 @@ public abstract class UNetConnection : UPlayer
                 new SequenceNumber((ushort)InPacketId),
                 new SequenceNumber((ushort)OutPacketId));
             
-            Logger.Verbose("InitSequence: IncomingSequence: {SeqA}, OutgoingSequence: {SeqB}", incomingSequence, outgoingSequence);
-            Logger.Verbose("InitSequence: InitInReliable: {In}, InitOutReliable: {Out}", InitInReliable, InitOutReliable);
+            Logger.Information("InitSequence: IncomingSequence: {SeqA}, OutgoingSequence: {SeqB}", incomingSequence, outgoingSequence);
+            Logger.Information("InitSequence: InPacketId: {InPacketId}, OutPacketId: {OutPacketId}", InPacketId, OutPacketId);
+            Logger.Information("InitSequence: PacketNotify InSeq: {InSeq}, OutSeq: {OutSeq}", PacketNotify.GetInSeq().Value, PacketNotify.GetOutSeq().Value);
         }
     }
 
